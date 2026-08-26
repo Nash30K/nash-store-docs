@@ -19,8 +19,22 @@ Config.ATM = {
     FreezeOnMaxAttempts = true,
     ScanRadius = 50.0,            -- ATM prop scan radius (meters)
     InteractionDistance = 1.5,
+
+    -- Toggles for individual ATM actions.
+    -- false = hide the button from the ATM menu and refuse the callback server-side.
+    AllowDeposit = true,
+    AllowWithdraw = true,
 }
 ```
+
+## Disable specific ATM actions
+
+Set `AllowDeposit` or `AllowWithdraw` to `false` to remove the corresponding button from the ATM menu. Remaining buttons shift up in place, so a menu with `AllowDeposit = false` renders as **Withdraw / Balance / Exit**.
+
+Both options are enforced on the server as well, so a tampered client cannot bypass the restriction. Useful setups:
+
+- **Deposits at the bank only** — `AllowDeposit = false` forces players to visit an agency to add cash to their account. ATMs remain usable for withdrawals and balance checks.
+- **Bank-agency roleplay** — set both to `false` to turn ATMs into balance-only kiosks (Balance / Exit).
 
 ## Daily limits per subscription
 

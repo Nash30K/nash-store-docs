@@ -6,6 +6,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/) and the proje
 
 ---
 
+## [1.0.8] - Configurable RIB, ATM action toggles, phone auto-refresh after registration
+
+### Added
+
+- **`Config.BankInfo`** - the **Bank details** modal (IBAN / BIC / bank name and address / correspondent BIC) is now fully configurable through a dedicated `shared/config.bankinfo.lua` file. Set `IbanCountry` to `US`, `GB`, `DE`, `CH`, etc. and adapt the surrounding fields to match your server's country. See the new [config.bankinfo.lua](config/config-bankinfo.md) reference page.
+- **`Config.ATM.AllowDeposit`** and **`Config.ATM.AllowWithdraw`** - two new options in `shared/config.atm.lua` to disable the deposit and / or withdraw buttons on ATMs independently. Hidden button-side and refused server-side, so no client bypass. Common use: force players to come to the bank for deposits by setting `AllowDeposit = false`. See the updated [config.atm.lua](config/config-atm.md) reference.
+
+### Fixed
+
+- **Phone banking app stayed on "Account required" after opening a bank account** - new players who registered at the bank NPC used to see the "Account required" screen on the phone banking app until they restarted the script or reconnected. The server now broadcasts `nash_banking:playerRegistered` on successful registration; `nash_banking_phone` forwards it to the NUI as `accountRegistered` and the React context refetches its state immediately.
+
+### Changed
+
+- **`BankInfoModal` no longer reads bank RIB fields from `useLocale.ts`** - the four locale keys `bank_iban_value`, `bank_bic_value`, `bank_address`, `bank_correspondent_bic_value` were removed from `fr` and `en` blocks. The modal now reads exclusively from `Config.BankInfo` sent through the `openBank` NUI payload. This gives one single source of truth for these values (the Lua config file), regardless of the active language.
+
+---
+
 ## [1.0.7] — Quasar Phone V3, character switch, runtime locales
 
 ### Added

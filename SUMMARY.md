@@ -31,6 +31,7 @@
     * [config.business.lua](nash-banking/config/config-business.md)
     * [config.features.lua](nash-banking/config/config-features.md)
     * [config.discord.lua](nash-banking/config/config-discord.md)
+    * [config.bankinfo.lua](nash-banking/config/config-bankinfo.md)
   * [FAQ](nash-banking/faq.md)
   * [Common Errors](nash-banking/common-errors.md)
   * [Guides](nash-banking/guides/README.md)
