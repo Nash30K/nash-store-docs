@@ -6,7 +6,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/) and the proje
 
 ---
 
-## [1.1.0] - External business system integration (TPE deposit hooks)
+## [1.0.9] - External business system integration (TPE deposit hooks)
 
 ### Added
 
