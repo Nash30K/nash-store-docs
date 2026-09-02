@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/) and the proje
 
 ---
 
+## [1.1.0] - External business system integration (TPE deposit hooks)
+
+### Added
+
+- **`Config.TPE.BusinessDepositHook`** and **`Config.TPE.EmployeeDepositHook`** - two optional server-side hooks in `shared/config.business.lua` to route TPE payment receipts to an external business system (`esx_society`, `qb-management`, custom scripts, ...) instead of Nash Banking's internal `nash_businesses.balance` or the seller's personal bank account. `BusinessDepositHook` fires when the TPE was purchased through Nash Banking's business panel; `EmployeeDepositHook` fires for generic TPE items and receives the seller's `job.name` so you can dispatch by job. Both default to `nil`, in which case the existing behavior is preserved 100%. Returning `true` from a hook tells Nash Banking your code handled the credit, and both the internal balance credit AND the internal transaction log are skipped for that payment. Notifications and Discord logs are still emitted. See the updated [config.business.lua](config/config-business.md) reference for the full signatures and copy-paste examples.
+
+---
+
 ## [1.0.8] - Configurable RIB, ATM action toggles, phone auto-refresh after registration
 
 ### Added
