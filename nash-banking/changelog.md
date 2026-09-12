@@ -6,7 +6,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/) and the proje
 
 ---
 
-## [1.0.10] - Cumulative daily caps + ATM tier enforcement
+## [1.1.0] - Cumulative daily caps + ATM tier enforcement
 
 ### Added
 

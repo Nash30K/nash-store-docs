@@ -1,6 +1,6 @@
 # nash_banking
 
-**Latest release: v1.0.10** — see the [Changelog](changelog.md) for what's new.
+**Latest release: v1.1.0** — see the [Changelog](changelog.md) for what's new.
 
 nash_banking is a premium, feature-complete banking system for FiveM. It ships with a desktop UI, two phone apps (LB Phone / Quasar Phone), a TPE (payment terminal) system, cards, investments, crypto, businesses, savings, subscriptions, and an admin panel.
 
