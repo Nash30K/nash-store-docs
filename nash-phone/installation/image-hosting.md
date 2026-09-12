@@ -12,7 +12,8 @@ Everything happens in `config/upload.lua`.
 | Camera photos | Refuses to shoot, warns the player, red line in the console |
 | Camera videos | Same |
 | Snapz and ChatApp snaps | No in-game capture can be saved |
-| Camera roll, profile pictures, social posts | Nothing new to display: they all read links produced by the two above |
+| Photos, add by link | The **+** button of the Albums tab does not appear: a pasted link would have nowhere to be re-hosted |
+| Camera roll, profile pictures, social posts | Nothing new to display: they all read links produced by the features above |
 
 `/phonecheck` lists a missing host as a non-blocking issue, and `/phonedeps` tells you whether
 the problem is the host or `screenshot-basic`.
@@ -66,7 +67,7 @@ mid-game, and the Camera app asks on every open.
 
 | Path | Who posts the file | Used by |
 |---|---|---|
-| **Presigned** | The client, straight to the host | Photos (posted by `screenshot-basic` from its own page) and videos |
+| **Presigned** | The client, straight to the host | Camera stills (posted by `screenshot-basic` from its own page), videos, and pictures added by link in the Photos app |
 | **Relay** | The server, from a base64 payload | Fallback only. Kept for a host that cannot presign, and for the browser preview |
 
 The presigned path exists because the image must not travel through the FiveM network at all.
@@ -96,6 +97,11 @@ That is **12 uploads per player per minute**. The limit is checked before the ro
 Fivemanage, since it is that round trip, and the quota it spends on your account, that a
 modified client would try to run in a loop.
 
+Adding a photo by link draws on the same counter and the same account. An import asks for up to
+**two** presigned addresses, one for the picture and one for its thumbnail, so a player can add
+about six pictures a minute. A link that is already on Fivemanage is uploaded again like any
+other, so that the copy lives on your account and follows your size settings.
+
 ## Error codes
 
 Errors reach the interface as short codes; the useful detail goes to the server console.
@@ -113,6 +119,10 @@ Errors reach the interface as short codes; the useful detail goes to the server 
 | `no_file`, `decode_failed` | Empty or unreadable base64 payload on the relay path |
 | `http_<status>`, `no_url` | The host rejected the relay upload, or returned no address |
 
+Adding a photo by link does not show these codes: the player gets a readable message instead
+("This link has expired", "This image is too large"...). The full list, with the cause of each,
+is in [Common Errors](../common-errors.md#adding-a-photo-by-link-fails).
+
 ## Why not a Discord webhook
 
 Because it stopped working. Since December 2023 Discord signs its CDN addresses and they
@@ -127,7 +137,33 @@ fine, display perfectly, and the whole camera roll turns into a grid of broken t
 next day. That failure is invisible at install time, which is why the mode was removed rather
 than left in with a warning.
 
-Fivemanage returns a permanent address, with no parameter and no signature.
+Fivemanage returns an address with no parameter, no signature and no expiry of its own. How long
+the file behind it lives is up to your account: see the next section.
+
+Players can still bring a picture posted on Discord into their phone, with the **+** button of
+Photos. The phone downloads it while the link still works and re-hosts it on Fivemanage; the
+Discord link itself is never stored. See
+[Adding photos by link](../config/config-main.md#adding-photos-by-link).
+
+## How long links last
+
+Every address the phone stores, and every link a player copies out of Photos, stays valid as
+long as your Fivemanage account keeps the file. That is a setting of **your Fivemanage
+account**, not of the phone:
+
+| Retention on your Fivemanage account | What happens to the files |
+|---|---|
+| None | Kept until you delete them yourself |
+| 7, 30, 90, 180 or 365 days (set per media type) | Deleted for good once they are older than that |
+
+The phone does not ask Fivemanage to exempt its files, so a retention policy applies to camera
+photos, videos and pictures added by link alike. Once a file is gone, the camera roll shows a
+crossed-out picture in its place ("Image Unavailable" in the full-screen viewer), and a link
+pasted elsewhere stops working. Leave retention off if your players expect their camera roll to
+last.
+
+A copied link is public: anyone who has it can open the file. Deleting a photo from the phone
+removes the row from the camera roll, not the file from Fivemanage.
 
 ## Quality and weight
 
@@ -144,3 +180,7 @@ The size of what you upload is set in `Config.Camera` (`config/main.lua`), not h
 | `Recording.Microphone` | `true` | Record the filming player's voice. `false` removes the button from the app |
 
 Game audio cannot be recorded: the embedded browser never receives the GTA audio mix.
+
+Pictures added by link in Photos are re-encoded with the same `Photo.LongEdgePx` and
+`Photo.Quality`, so an imported picture weighs about as much as a camera photo, whatever the
+size of the original.

@@ -57,7 +57,7 @@ A custom framework or inventory is written in `server/bridge/custom.lua`: see
 
 <summary>Do I have to import the SQL file?</summary>
 
-No. `server/db/schema.lua` creates the 26 tables at boot and adds new columns and indexes on
+No. `server/db/schema.lua` creates the 27 tables at boot and adds new columns and indexes on
 later updates without any action from you. `sql/nash_phone.sql` ships the same schema for
 owners who prefer to prepare the database by hand, but it is not needed.
 
@@ -380,6 +380,62 @@ If you are migrating from an older install, `nashphone_cleanup` (server console 
 the dead Discord-hosted rows, and `nashphone_cleanup confirm` deletes them. The pictures are
 gone either way; only the rows remain.
 
+Players can still bring a picture from Discord into their phone: see the next question.
+
+</details>
+
+<details>
+
+<summary>Can players import a photo from Discord?</summary>
+
+Yes. In Photos, the **+** button of the **Albums** tab opens an **Add Photo by URL** alert. In
+Discord, the player right-clicks the image, picks **Copy Link**, pastes it into the alert and
+taps **Add**. The photo appears in the Library and in the **Recently Saved** collection.
+
+The phone does not keep the Discord link: it expires after 24 hours, and `nashphone_cleanup`
+would delete it. The player's game downloads the picture while the link still works,
+re-encodes it like a camera photo and uploads it to your Fivemanage storage. The saved photo
+points at Fivemanage, so it keeps working after the Discord link dies. Your server never
+downloads the link itself.
+
+What to tell players:
+
+- **Any direct link to a picture works**, not only Discord: Imgur, Fivemanage, most image
+  hosts. JPEG, PNG, GIF and WebP are accepted, up to 15 MB and 8192 pixels per side by default.
+- **A Discord link older than 24 hours** is refused with "This link has expired. Copy it again
+  from Discord." Copying it again from the message gives a fresh one.
+- **A link to a page is not a link to a picture.** "Copy Message Link" in Discord, or an Imgur
+  page instead of the `i.imgur.com` address, is refused as not being a photo.
+- **An animated GIF keeps only its first frame**, and the photo's metadata (GPS position
+  included) is removed.
+
+No **+** button? The server has no image host in `config/upload.lua`, or
+`Config.Gallery.Import.Enabled` is `false`. Every setting is in
+[config/main.lua](config/config-main.md#adding-photos-by-link).
+
+</details>
+
+<details>
+
+<summary>How do I share a phone photo on Discord?</summary>
+
+Copy its link, then paste it in Discord. Two ways, same result:
+
+- open the photo, tap the **…** button at the top right, then **Copy**;
+- or tap **Share**, then **Copy Photo** (**Copy Video** for a video).
+
+A **Link Copied** bubble confirms it. The link goes to the player's clipboard, the same one as
+the rest of their computer, so it pastes straight into Discord, where the link of a photo
+displays as the picture itself.
+
+Two things worth knowing before players rely on it:
+
+- **The link is public.** Anyone who has it can open the file, with no sign-in. Deleting the
+  photo from the phone does not delete the file from Fivemanage.
+- **It lasts as long as your Fivemanage account keeps the file.** With no retention policy, the
+  file stays until you delete it. With one (7 to 365 days), the file is deleted after that delay
+  and the link stops working. See [How long links last](installation/image-hosting.md#how-long-links-last).
+
 </details>
 
 <details>
@@ -391,6 +447,9 @@ cost something (asking for a presigned URL, and the legacy relay), because both 
 the same upload. It exists because removing the API key from the client prevents reading it,
 not using it: without a counter, a modified client could drain your Fivemanage quota without
 even sending a file.
+
+A photo added by link counts on the same counter: up to two uploads per import, one for the
+picture and one for its thumbnail.
 
 Photo and video sizes are set in `Config.Camera`: `Photo.LongEdgePx = 1920` at quality `0.8`,
 and `Recording` at 30 seconds max, 30 fps, 1 200 000 bit/s and a 720 px long edge (accepted

@@ -23,18 +23,30 @@ places of the Maps app **and** location sharing in Messages.
 
 ```lua
 Config.Map.Bounds = {
-    minX = -5730.0,
-    maxX = 6270.0,
-    minY = -4000.0,
-    maxY = 8000.0,
+    minX = -5718.2,
+    maxX = 6776.7,
+    minY = -4083.1,
+    maxY = 8411.8,
 }
 ```
 
 {% hint style="warning" %}
 **The two spans must stay equal.** The map tiles are square: one tile covers as many metres
 wide as it does tall. If `maxX - minX` differs from `maxY - minY`, the projection stretches one
-axis and places drift the further they sit from the centre. The shipped values are 12000 x
-12000.
+axis and places drift the further they sit from the centre. The shipped values are
+12494.9 x 12494.9.
+{% endhint %}
+
+{% hint style="info" %}
+**These numbers are measured, not estimated.** They come from six landmarks located on the
+tiles themselves (Maze Bank Tower, Legion Square, the La Mesa Los Santos Customs, the central
+hospital, the Fort Zancudo control tower, the Mount Chiliad summit) matched against their game
+coordinates. Los Santos International Airport was deliberately kept **out** of that
+calculation and used as a control: it lands on its terminal. The remaining error is 10 to 25
+metres in the city.
+
+Change them only if your server actually uses a different map. Nudging them "to see" will
+undo a calibration you cannot easily redo by eye.
 {% endhint %}
 
 To fine-tune: stand somewhere very recognisable, run `/phonepos`, add the place to the list
@@ -42,8 +54,8 @@ below and open Maps. If the dot lands off target, shift **both** bounds of the s
 together (for example `minX` and `maxX` by +200 each) so you do not reintroduce a stretch.
 
 If the block is missing, or degenerate (`minX == maxX`, or `minY == maxY`), the phone falls
-back to internal bounds of `-4000 / 4500` on X and `-4000 / 8000` on Y. Those fallback bounds
-are **not square**, so do not rely on them: keep the block.
+back to the same measured values internally, so a deleted block no longer produces a wrong
+map. Keep the block anyway: it is the only place you can adapt the phone to a custom map.
 
 With `Config.Debug = true` in [config/main.lua](config-main.md), `/phoneconfig` prints the
 computed width and height and says whether they are square, and `/phonecheck` lists non-square

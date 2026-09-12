@@ -39,6 +39,10 @@ Three tiers are shipped by default. The `features` block is what the server read
         maxTransferAmount = 5000,
         maxWithdrawPerDay = 3,
         maxWithdrawAmount = 2000,
+        maxWithdrawAmountPerDay = -1,
+        maxDepositPerDay = -1,
+        maxDepositAmount = -1,
+        maxDepositAmountPerDay = -1,
         freeAtmWithdrawals = 2,
         nashPointsMultiplier = 1,
         investAccess = false,
@@ -70,6 +74,10 @@ Three tiers are shipped by default. The `features` block is what the server read
         maxTransferAmount = 25000,
         maxWithdrawPerDay = 10,
         maxWithdrawAmount = 10000,
+        maxWithdrawAmountPerDay = -1,
+        maxDepositPerDay = -1,
+        maxDepositAmount = -1,
+        maxDepositAmountPerDay = -1,
         freeAtmWithdrawals = 5,
         nashPointsMultiplier = 2,
         investAccess = true,
@@ -103,6 +111,10 @@ Three tiers are shipped by default. The `features` block is what the server read
         maxTransferAmount = -1,
         maxWithdrawPerDay = -1,
         maxWithdrawAmount = -1,
+        maxWithdrawAmountPerDay = -1,
+        maxDepositPerDay = -1,
+        maxDepositAmount = -1,
+        maxDepositAmountPerDay = -1,
         freeAtmWithdrawals = -1,
         nashPointsMultiplier = 5,
         investAccess = true,
@@ -120,10 +132,12 @@ Three tiers are shipped by default. The `features` block is what the server read
 | `maxCards` | number | Maximum number of cards a player can own on this tier |
 | `maxTransferPerDay` | number | Daily transfer count cap (`-1` = unlimited) |
 | `maxTransferAmount` | number | Max amount per transfer |
-| `maxWithdrawPerDay` | number | Daily withdraw count cap |
-| `maxWithdrawAmount` | number | Max amount per withdraw |
+| `maxWithdrawPerDay` | number | Daily withdraw count cap (`-1` = unlimited) |
+| `maxWithdrawAmount` | number | Max amount per single withdraw (`-1` = unlimited) |
+| `maxWithdrawAmountPerDay` | number | Cumulative daily withdraw amount cap (`-1` = unlimited, default). Aggregates NPC + ATM withdraws for that day. |
 | `maxDepositPerDay` | number | Daily deposit count cap (`-1` = unlimited, default) |
 | `maxDepositAmount` | number | Max amount per single deposit (`-1` = unlimited, default) |
+| `maxDepositAmountPerDay` | number | Cumulative daily deposit amount cap (`-1` = unlimited, default). Aggregates NPC + ATM deposits for that day. |
 | `freeAtmWithdrawals` | number | Free ATM withdraws per month, past which `Config.ATM.Fee` applies |
 | `nashPointsMultiplier` | number | Loyalty points earned per 10€ spent |
 | `investAccess` | boolean | Unlocks the Invest page (stocks / ETFs) |

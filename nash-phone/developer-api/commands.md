@@ -1,6 +1,6 @@
 # Commands
 
-NASH Phone registers three kinds of commands: the one players use every day, two client-side diagnostics anyone can run, and a set of 38 test commands that stay locked until you explicitly open them.
+NASH Phone registers three kinds of commands: the one players use every day, two client-side diagnostics anyone can run, and a set of 39 test commands that stay locked until you explicitly open them.
 
 ## Player commands
 
@@ -115,7 +115,12 @@ nashphone_cleanup confirm    # deletes
 
 **Permissions:** **server console only** (`source == 0`). A player typing it in game is refused. It is deliberately not ACE-gated: physical access to the console is the right barrier here, and an ACE would invite a too-permissive setup.
 
-**Behavior:** without `confirm` it reports how many rows are affected and how many players are concerned, and changes nothing. With `confirm` it deletes them.
+**Behavior:** without `confirm` it reports how many rows are affected and how many players are concerned, and changes nothing. With `confirm` it deletes them, and turns every image message whose address contains `discordapp.` back into text, even a recent one, so the conversation keeps a trace instead of an empty bubble.
+
+**What it matches:** gallery rows whose address contains `discordapp.`, whatever wrote them.
+
+- **Photos added by link are never affected**, even when the player pasted a Discord link: Photos re-hosts the picture on Fivemanage before saving it, so the stored address never points at Discord.
+- A media saved by another resource through the `SaveToGallery` export is stored with the address it was given. A Discord address written that way is matched like any other, and dies after 24 hours anyway.
 
 </details>
 
@@ -181,6 +186,7 @@ A player who passes none of them gets an explicit refusal, not silence.
 | `/phonecount` | Counts your rows per table |
 | `/phonesetup` | Where your first-run setup stands |
 | `/phonesetupreset` | Replays the first-run setup on your next open |
+| `/phonefaceid` | Which phones carry your face, the serial of the one you carry and whose it is, and what the next Face ID scan will answer. Writes nothing to the database |
 
 `/phonewipe confirmer` keeps three things: your phone number, your mail address and your cloud account. Everything else goes: contacts, SMS, calls, photos, bank history, notifications, notes, reminders, calendar, home layout, settings, screen time, mail, social accounts. SMS threads are removed from your side only, so your correspondent keeps their copy.
 

@@ -6,14 +6,21 @@ QBOX and replace only the inventory: which is the normal case, since an ESX serv
 
 ## What the phone asks of an inventory
 
-Two questions. Nothing else. There is no add, no remove, no metadata, no slot.
+Four questions. Nothing else. There is no add and no remove: the phone creates no item and
+never moves one.
 
 | Question | Interface | Used for |
 | -------- | --------- | -------- |
 | Does this player carry this item? | `Inventory.hasItem(src, item)` | Opening the phone (`Config.UseItem`), pairing the earbuds (`Config.Earbuds.requireItem`) |
 | Is this item **declared** on the server? | `Inventory.itemExists(name)` | The startup warning, and `/phonedeps` |
+| What is the serial of the device this player carries? | `Inventory.serial(src, item)` | Recognising a **new phone**, which asks for the first-run setup again, and **Face ID**, which recognises one character per phone |
+| Does this player still carry the device with this serial? | `Inventory.porteSerial(src, item, serial)` | The same, asked in the safer direction |
 
-The phone creates no item and never moves one.
+The last two are **optional**. They only work on inventories that keep data **per item
+instance**, and they return `nil` everywhere else, in which case the phone behaves exactly as it
+did before this feature existed: the setup never replays, and Face ID recognises everybody. See
+[A new phone asks for the setup again](#a-new-phone-asks-for-the-setup-again) below, and
+[Settings > Face ID](../apps/README.md#system).
 
 ## Built-in providers
 
@@ -23,6 +30,15 @@ The phone creates no item and never moves one.
 | `qb` | `qb-inventory` **or** `lj-inventory` started | The framework player object's `Functions.GetItemByName(item).amount > 0` | The framework's item table |
 | `framework` | Always accepts: last resort | The framework bridge's `invHasItem` | The framework bridge's `invItems` |
 | `custom` | Never: you name it | `NashInvCustom.hasItem` | `NashInvCustom.itemExists` |
+
+Device recognition, provider by provider:
+
+| Mode | Recognises a new phone? | How |
+| ---- | ----------------------- | --- |
+| `ox` | Yes, fully | The serial lives in the item's `metadata.serial`. `GetSlotWithItem` is asked for **that exact serial**, so carrying two phones at once changes nothing |
+| `qb` | Best effort | The serial lives in the item's `info.serial`, written through the core's `SetItemData`. That function is checked before being called: on a fork that does not have it, nothing is written and recognition stays off. A new serial is written on the **first** matching item; checking a known serial reads **every** copy in `PlayerData.items`, so carrying two phones does not fail Face ID |
+| `framework` | Only if you provide it | The framework bridge's `invSerial` and `invPorteSerial`, both shipped returning `nil` |
+| `custom` | Only if you provide it | `NashInvCustom.serial` and `NashInvCustom.porteSerial`, both shipped returning `nil` |
 
 Auto order is `ox`, then `qb`, then `framework`. The full detection rules are in the
 [Compatibility Overview](README.md).
@@ -63,10 +79,11 @@ prints:
 [nash_phone] Config.Inventory = "qs" : inconnu. Attendu : auto, ox, qb, framework, custom.
 ```
 
-## The two functions to implement
+## The functions to implement
 
-At the bottom of `server/bridge/custom.lua`, in the global `NashInvCustom` table. Both run on
-the server.
+At the bottom of `server/bridge/custom.lua`, in the global `NashInvCustom` table. All of them
+run on the server. The first two are required; the last two are optional and ship returning
+`nil`.
 
 <details>
 
@@ -121,6 +138,97 @@ This function has no effect on gameplay: it only drives the startup diagnostic a
 
 </details>
 
+<details>
+
+<summary>serial(src, item) : optional</summary>
+
+Returns the serial of the device this player is carrying, or `nil`.
+
+The serial must live **inside the item**, not in your database and not on the player. Write it
+the first time you read one, then return it unchanged from then on. 64 characters maximum: a
+longer string is refused, because the column that stores it would truncate it and the phone
+would see a different serial every time.
+
+```lua
+serial = function(src, item)
+    local slot = exports['your-inventory']:GetFirstSlot(src, item)
+    if not slot then return nil end                 -- not carrying one: say nothing
+    if slot.metadata and slot.metadata.serial then return slot.metadata.serial end
+
+    local fresh = ('%x-%08x'):format(os.time(), math.random(0, 0x7FFFFFFF))
+    exports['your-inventory']:SetMetadata(src, slot.id, { serial = fresh })
+    return fresh
+end,
+```
+
+{% hint style="danger" %}
+**Never derive the serial from the player.** Their identifier, their phone number, their
+character name: all of these are identical on every device they will ever hold, so a brand new
+phone would reopen the previous one's session and the whole feature would do nothing. The value
+has to belong to the object.
+{% endhint %}
+
+{% hint style="warning" %}
+If your inventory merges identical items into one stacked line with a quantity, there is nothing
+to distinguish and you should leave this returning `nil`. That is a deliberate, supported answer,
+not a gap: it keeps the behaviour the phone had before this feature.
+{% endhint %}
+
+</details>
+
+<details>
+
+<summary>porteSerial(src, item, serial) : optional</summary>
+
+Answers whether the player **still** carries the device with that serial.
+
+| Return | Meaning | What the phone does |
+| ------ | ------- | ------------------- |
+| `true` | Yes, this is their usual phone | Nothing |
+| `false` | No | Reads the current serial, and asks for the setup again if it is a different one |
+| `nil` | You cannot tell | Nothing for the setup. Face ID falls back on `serial`: the player is recognised only if the serial it returns is theirs |
+
+If you implement `serial`, implement `porteSerial` too. With `serial` alone, Face ID can only
+compare the **first** phone your inventory returns: a player who carries somebody else's phone
+before their own would be refused on it.
+
+```lua
+porteSerial = function(src, item, serial)
+    return exports['your-inventory']:HasItemWithMetadata(src, item, { serial = serial })
+end,
+```
+
+The question is asked in this direction on purpose. Asking "which serial does this player's
+phone have" forces your inventory to pick one when the player carries two, and nothing
+guarantees it picks the same one twice: the setup would replay every other time the phone
+opened.
+
+</details>
+
+## A new phone asks for the setup again
+
+Every device gets a serial stamped into its item the first time the phone reads one. When the
+player opens a phone whose serial does not match the one recorded for their character, the
+first-run setup runs again, and the byCloud account is reopened with its password: exactly like
+a real handset.
+
+- Putting the phone in a trunk and taking it back changes nothing. The serial is the same.
+- **Only the setup row is reset.** Messages, contacts, the camera roll and the phone number all
+  belong to the character and to their line, not to the handset. A player who loses their phone
+  does not lose their texts.
+- **The byCloud account is untouched.** It never belonged to the device, which is why it can be
+  reopened from the new one with its password.
+- **Phones already in circulation keep their setup.** The first serial read is adopted without
+  erasing anything; only the *next* device counts as new.
+- With `Config.UseItem = false` there is no item, therefore no device to recognise, and the
+  setup never replays.
+
+`/phonesetup` prints the recorded serial next to the one currently in hand, which is the fastest
+way to tell "different handset" from "setup was never saved".
+
+A resource that wants to know fires on `nash-phone:deviceChanged`: see
+[Server Events](../developer-api/server-events.md).
+
 ## The items to declare
 
 The resource creates no item. Two names come from the config:
@@ -163,8 +271,12 @@ Where to declare them depends on your inventory:
 - **`Config.Inventory = 'framework'` on QBOX.** QBOX has no native inventory, and its bridge
   returns `nil` for both native-inventory functions on purpose. Item ownership then always
   answers `false`.
-- **Returning a count instead of a boolean.** `hasItem` is compared against a literal `true`; a
-  number is treated as "does not have it".
+- **Returning something that is neither a boolean nor a count.** `hasItem` accepts `true`, a
+  number greater than zero, and the string `'1'`, which covers every sane way of writing one.
+  It does **not** accept a table or an arbitrary string: Lua would call those true, and a
+  malformed return would pass for ownership.
+- **Deriving the serial from the player instead of the item.** Recognition then never fires: a
+  new handset carries the same value as the old one.
 - **Editing `server/bridge/custom.lua` and losing it on update.** It is the one file in the
   resource meant to be edited. Keep a copy before replacing the folder.
 
@@ -182,3 +294,9 @@ Where to declare them depends on your inventory:
    and disconnects them, and the item is never consumed.
 7. Temporarily setting `Config.ItemName` to a name that does not exist produces the red startup
    block. That proves `itemExists` is answering, not returning `nil` by accident.
+8. Only if you implemented `serial`: `/phonesetup` shows the same value on both lines, opening
+   and closing the phone several times never changes it, and storing the phone in a trunk and
+   taking it back does not change it either.
+9. Only if you implemented `serial`: destroying the phone item, receiving a fresh one and
+   opening it runs the first-run setup again, and the byCloud account reopens with its
+   password. The player's texts and contacts are still there afterwards.

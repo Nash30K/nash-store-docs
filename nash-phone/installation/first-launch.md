@@ -32,7 +32,7 @@ GTA prop.
 | `[nash_phone] framework détecté : esx.` | The framework bridge resolved. Replace `esx` with `qbcore` / `qbox` |
 | `[nash_phone] framework : esx (imposé par la configuration).` | Same, but forced through `Config.Framework` |
 | `[nash_phone] inventaire détecté : ox.` | The inventory bridge resolved (`ox`, `qb`, `framework`) |
-| `[nash_phone] schéma DB prêt (26 tables).` | The database is ready. Extra text appears when columns or indexes were added. See [Database](database.md) |
+| `[nash_phone] schéma DB prêt (27 tables).` | The database is ready. Extra text appears when columns or indexes were added. See [Database](database.md) |
 | `[nash_phone] AUCUN framework détecté. Le téléphone ne pourra identifier personne.` | Fatal in practice: no player can be identified. Check that your framework is started before `nash_phone` |
 | `[nash_phone] Config.UseItem = true but the item "phone" DOES NOT EXIST` | Nobody can open the phone. See [Inventory items](inventory-items.md) |
 | `[nash_phone] modèle « custom_phone_prop » introuvable, repli sur…` | `nash-phoneprop` is missing or started too late |
@@ -102,7 +102,7 @@ never bypasses it.
 | `/phoneconfig` | The configuration **as the server read it**: the fastest way to spot a badly written block that was silently ignored |
 | `/phonediag` | Full report on one phone, app by app. From the console: `phonediag <player id>` |
 | `/phonebase` | Real row count per table, all characters included |
-| `/phonehelp` | Lists all 38 test commands |
+| `/phonehelp` | Lists all 39 test commands |
 
 {% hint style="info" %}
 `/phoneconfig` is worth running once on every install. It prints the applied values (brand,
@@ -112,7 +112,7 @@ a block that failed to load shows up immediately.
 
 ## Test commands
 
-The other 31 commands exist so you can test the phone **alone**, without a second player: they
+The other 32 commands exist so you can test the phone **alone**, without a second player: they
 fabricate an incoming mail, a received message, a call, a story, a transfer.
 
 | Area | Commands |
@@ -120,7 +120,7 @@ fabricate an incoming mail, a received message, a call, a story, a transfer.
 | Content | `/phoneseed`, `/phonecount`, `/phonewipe`, `/phonefakebank`, `/phonefakenotif`, `/phonebattery`, `/phoneearbuds` |
 | Calls, SMS, mail | `/phonefakecall`, `/phonecall`, `/phonehangup`, `/phonefakesms`, `/phonesms`, `/phoneseedsms`, `/phonefakemail`, `/phonemail`, `/phonecomms` |
 | Social networks | `/phonefakemsg`, `/phonefakepost`, `/phonefakestory`, `/phonefakelike`, `/phonefakecomment`, `/phonefakefollow`, `/phonesocialnotifs`, `/phonesocialseed`, `/phonesocial`, `/phonesocialwipe`, `/phonesnapmap`, `/phonelive`, `/phonelivewho` |
-| Setup wizard | `/phonesetup`, `/phonesetupreset` |
+| Setup wizard and Face ID | `/phonesetup`, `/phonesetupreset`, `/phonefaceid` |
 
 Useful examples:
 

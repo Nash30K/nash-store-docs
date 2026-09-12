@@ -72,9 +72,15 @@ Opens the phone on that client, unconditionally.
 TriggerClientEvent('nash_phone:open', src)
 ```
 
-**Parameters:** none.
+**Parameters:**
+
+| Name | Type | Description |
+|---|---|---|
+| `device` | `string?` | Optional. Serial number of the phone item the player opens with. Leave it out from your own scripts |
 
 **Behavior:** calls the same open path as the key binding, so focus, the control lock (the player can still walk), the prop and the state bags all follow. It does **not** check `Config.UseItem`: this is the event the inventory item and the item-gated `nash_phone:requestOpen` both end on, after their own check.
+
+`device` is what relocks a phone that has changed hands (see [Face ID](../apps/README.md#system)): the resource sends it itself from `nash_phone:requestOpen` and the inventory item. Without it, the phone simply opens where it was left.
 
 An open still fails silently if the phone is confiscated (`ToggleDisabled`), the player is dead, or the phone is already open.
 

@@ -257,16 +257,22 @@ key still work, and both still check that the player carries the item when
 
 <details>
 
-<summary>invHasItem(src, item) / invItems()</summary>
+<summary>invHasItem(src, item) / invItems() / invSerial(src, item) / invPorteSerial(src, item, serial)</summary>
 
-The framework's **native** inventory. These two are only read when `Config.Inventory` resolves
+The framework's **native** inventory. These are only read when `Config.Inventory` resolves
 to `'framework'`.
 
-- `invHasItem(src, item)` returns a boolean. Only a literal `true` counts as "carried".
+- `invHasItem(src, item)` returns whether the player carries at least one. `true`, a number
+  greater than zero, and the string `'1'` are all accepted.
 - `invItems()` returns the table of declared items keyed by name, or `nil` if you cannot
   provide it: `nil` means "cannot tell", and the phone stays quiet instead of warning.
+- `invSerial` and `invPorteSerial` are **optional**, and ship returning `nil`. They let the
+  phone tell one handset from another, so that a new phone asks for the first-run setup again.
+  A framework's native inventory usually cannot do this, and `nil` is a perfectly good answer:
+  the setup then simply never replays. The two functions are documented in full, with their
+  pitfalls, under `serial` and `porteSerial` in [Custom Inventory](custom-inventory.md).
 
-If your items are held by `ox_inventory` or another inventory resource, ignore these two and
+If your items are held by `ox_inventory` or another inventory resource, ignore all four and
 configure the inventory bridge instead. See [Custom Inventory](custom-inventory.md).
 
 </details>
@@ -280,6 +286,8 @@ try to override them:
 | ------ | ---------- |
 | `Framework.hasItem(src, item)` | Delegated to the **inventory** bridge, never to the framework |
 | `Framework.itemExists(name)` | Delegated to the **inventory** bridge |
+| `Framework.itemSerial(src, item)` | Delegated to the **inventory** bridge |
+| `Framework.itemPorteSerial(src, item, serial)` | Delegated to the **inventory** bridge |
 | `Framework.hasJob(src, name)` | `job(src).name == name`, strict: no case folding, no trimming |
 | `Framework.jobPlayers(name)` | A scan of the native `GetPlayers()`, filtered with `hasJob` |
 | `Framework.name()` | The resolved bridge name, reported by `/phonedeps` |

@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/) and the proje
 
 ---
 
+## [1.0.10] - Cumulative daily caps + ATM tier enforcement
+
+### Added
+
+- **`maxDepositAmountPerDay`** and **`maxWithdrawAmountPerDay`** in `config.subscriptions.lua` per tier - cumulative daily amount caps for deposits and withdraws, in addition to the existing per-transaction (`maxDepositAmount` / `maxWithdrawAmount`) and per-day-count (`maxDepositPerDay` / `maxWithdrawPerDay`) limits. Both default to `-1` (no cap) so existing setups behave identically. Aggregates deposits or withdraws made through the bank NPC AND the ATM for the day, so a `250` cap really means 250 total per day across all channels. Server-side enforcement via `SUM(amount)` on `nash_transactions` for the current day.
+
+### Fixed
+
+- **ATM `deposit` and `withdraw` callbacks completely ignored subscription tier limits.** `nash_banking:atmDeposit` and `nash_banking:atmWithdraw` skipped `maxDepositAmount`, `maxDepositPerDay`, `maxWithdrawAmount`, `maxWithdrawPerDay` entirely, letting any tier bypass its caps as long as the transaction went through an ATM. Both callbacks now run the same tier check pipeline as the bank NPC (per-transaction cap, daily count, daily cumulative amount), and increment `nash_daily_counters` so the count check aggregates across NPC + ATM. Bank NPC deposit / withdraw behavior is unchanged.
+
+---
+
 ## [1.0.9] - External business system integration (TPE deposit hooks)
 
 ### Added

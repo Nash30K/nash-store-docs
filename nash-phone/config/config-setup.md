@@ -266,6 +266,35 @@ A value refused at any step writes nothing and interrupts nothing: the next scre
 appears. A setup blocked by one rejected field would be an unusable phone, whereas an unsaved
 language is just a setting to redo.
 
+## A new phone asks again
+
+Each handset carries a serial, stamped into the item's own data the first time the phone reads
+it. When a player opens a phone whose serial is not the one recorded for their character, the
+flow above runs again from `hello`, and the byCloud account is reopened with its password:
+exactly like a real handset.
+
+| Situation | What happens |
+| --------- | ------------ |
+| Stored in a trunk and taken back | Nothing. Same serial, same device |
+| Given a different phone item | The setup runs again |
+| Phone already owned before this version | Kept as it is. The first serial read is adopted without erasing anything, and only the *next* device counts as new |
+| `Config.UseItem = false` | Never replays. No item means no device to recognise |
+| Inventory without per instance data | Never replays. See [Custom Inventory](../compatibility/custom-inventory.md) for which inventories can do this |
+
+{% hint style="info" %}
+**Only the setup row is reset.** Messages, contacts, the camera roll, the bank history and the
+phone number all belong to the character and to their line, not to the handset: a player who
+loses their phone does not lose their texts. The byCloud account is not touched either, since it
+never belonged to the device.
+{% endhint %}
+
+`/phonesetup` prints the recorded serial next to the one currently in hand. That single line
+separates "this is a different handset" from "the setup was never saved", which otherwise look
+identical from the player's side.
+
+Other resources can react with the `nash-phone:deviceChanged` server event: see
+[Server Events](../developer-api/server-events.md).
+
 ## Fallbacks
 
 If `config/setup.lua` is missing, or `Config.Setup` is not a table, the server applies

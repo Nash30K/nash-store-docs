@@ -70,7 +70,7 @@ If you hit this after updating the resource, restarting is enough: the migration
 and prints what it added. The same rule applies to the `INDEXES` table just below it.
 
 ```
-[nash_phone] schéma DB prêt (26 tables, 3 colonne(s) ajoutée(s), 2 index ajouté(s)).
+[nash_phone] schéma DB prêt (27 tables, 3 colonne(s) ajoutée(s), 2 index ajouté(s)).
 ```
 
 ### A CSS rule works in the preview and is ignored in game
@@ -336,28 +336,103 @@ server console.
 
 ### The gallery is a grid of broken thumbnails
 
-**Cause:** the pictures were hosted on a Discord webhook. Since December 2023 Discord signs
-its CDN URLs and they expire after 24 hours. The links are dead and unrecoverable: the expired
-address does not carry the message id that would let anyone request a fresh one.
+**Cause:** two possibilities.
 
-**Fix:** nothing brings the photos back. From the **server console** only:
+1. The pictures were hosted on a Discord webhook. Since December 2023 Discord signs its CDN
+   URLs and they expire after 24 hours. The links are dead and unrecoverable: the expired
+   address does not carry the message id that would let anyone request a fresh one.
+2. The pictures are on Fivemanage, but a **retention policy** on your Fivemanage account
+   deleted the older files (7 to 365 days, depending on what was set). The recent photos still
+   display; the old ones show a crossed-out picture, and "Image Unavailable" once opened.
+
+**Fix:** nothing brings the photos back in either case. For the Discord rows, from the
+**server console** only:
 
 ```
 nashphone_cleanup            counts and shows a sample, deletes nothing
 nashphone_cleanup confirm    deletes the dead rows
 ```
 
-New photos go to Fivemanage, which returns a permanent address with no signature.
+New photos go to Fivemanage, which returns an address with no signature and no expiry of its
+own. To stop the second case from happening again, turn retention off in your Fivemanage
+dashboard. See [How long links last](installation/image-hosting.md#how-long-links-last).
 
 ### A player says photos stop working after a burst
 
 **Cause:** the upload limiter: 12 uploads per minute per player, shared between the presigned
 and relay paths. It exists because removing the API key from the client stops it being read,
 not used: without a counter, a modified client could drain your quota without sending a
-single file.
+single file. Photos added by link count too, up to two uploads each (the picture and its
+thumbnail).
 
 **Fix:** expected behaviour; wait a minute. If you need to change it, the constants are
 `UPLOAD_MAX`, `UPLOAD_WINDOW` and the two `COST_*` values in `server/services/upload.lua`.
+
+### The + button is missing in Photos
+
+The **+** button that adds a photo from a link sits at the top of the **Albums** tab
+(Collections in French), not on the Library tab.
+
+**Cause:** the phone hides it on purpose in two cases:
+
+1. no image host is configured in `config/upload.lua`: a pasted link would have nowhere to be
+   re-hosted, and the phone never stores the link itself;
+2. `Config.Gallery.Import.Enabled = false` in `config/main.lua`.
+
+**Fix:** fill in `config/upload.lua` (see [Image Hosting](installation/image-hosting.md)), or
+set `Enabled` back to `true`, then restart the resource.
+
+### Adding a photo by link fails
+
+When a link cannot be added, the phone shows a **Couldn't Add Photo** alert with one of the
+messages below. The picture is downloaded and checked by the player's own game, not by your
+server, so most of these failures never reach the server at all.
+
+| Message | Cause | Fix |
+|---|---|---|
+| *(the **Add** button stays grey)* | What was pasted is not a web link. The alert does not let it through, so no message appears | Paste the full link of the picture |
+| Adding photos by link is turned off on this server. | `Config.Gallery.Import.Enabled = false` (the **+** button is normally hidden in that case) | Expected if you turned it off. Otherwise set it to `true` and restart |
+| No photo host is set up on this server. | `config/upload.lua` has no API key, so there is nowhere to re-host the picture | Fill in `config/upload.lua` |
+| The image couldn't be downloaded. Check the link. | The player's game could not download the address: a mistyped or cut link, a host that is down, a page that needs a sign-in, a download longer than 20 seconds, or a host blocked on that player's network or in their country | Open the link in a browser outside the game. If it does not show the picture on its own, it cannot be added |
+| This link has expired. Copy it again from Discord. | A Discord link older than 24 hours: Discord answers 403, 404 or 410. It only refreshes its links inside its own app | In Discord, right-click the image, **Copy Link**, and paste the fresh link |
+| This image was removed by its host. | Imgur redirected to its "removed" placeholder. Only Imgur's placeholder is recognised: another host that answers 404 or 410 gives "The image couldn't be downloaded" | The picture no longer exists at that address |
+| This link doesn't lead to a photo (JPEG, PNG, GIF or WebP). | The address answers something other than a picture: a web page (Discord's **Copy Message Link**, an Imgur page rather than `i.imgur.com`), a video, an SVG. The format is read from the content of the file, not from its name | Use the direct link to the picture: in Discord, right-click the image and pick **Copy Link** |
+| This image is too large (15 MB max). | The file is heavier than `Config.Gallery.Import.MaxMegabytes`. The number in the message follows your setting | Use a lighter version of the picture, or raise the limit |
+| This image is too big (max 8,192 pixels per side and 50 million pixels in total). | The width or height is above `Config.Gallery.Import.MaxSidePx` (the number follows your setting), or the picture has more than 50 million pixels in total, whatever that setting says | Use a smaller version. Raising the limit gains nothing visible: every picture is brought down to `Config.Camera.Photo.LongEdgePx` anyway |
+| Uploading to the host failed. Try again. | The upload to Fivemanage failed: a network hiccup, a refused or revoked token, an exhausted account | Try again. If it fails every time, check the token as for the Camera (see the `presign fivemanage` entry above) |
+| Too many photos at once. Try again in a minute. | The rate limit, shared with the Camera | Wait a minute |
+| Something went wrong. Try again. | Anything not covered above, including the server refusing to save the final address | Try again. If every import fails this way while the Camera works, see the next entry |
+
+### Every import ends on "Something went wrong. Try again.", but the Camera works
+
+**Cause:** your Fivemanage account serves files from a **custom domain**, and that domain is
+not listed in `Config.Gallery.Import.AllowedHosts`. The picture is uploaded, then the server
+refuses to save an address on a host it does not know. The Camera does not go through that
+check, which is why it keeps working. An entry the server could not read has the same effect:
+it lists ignored entries in the console at startup
+(`Config.Gallery.Import.AllowedHosts : entree(s) ignoree(s) : …`).
+
+**Fix:** add the domain in `config/main.lua`, keep `fivemanage.com`, and restart:
+
+```lua
+Config.Gallery = {
+    Import = {
+        -- ...
+        AllowedHosts = { 'fivemanage.com', 'media.yourserver.com' },
+    },
+}
+```
+
+The files uploaded by the failed attempts stay in your Fivemanage storage, unused; delete them
+from the dashboard if you care about the space. See
+[AllowedHosts and a custom Fivemanage domain](config/config-main.md#allowedhosts-and-a-custom-fivemanage-domain).
+
+### "Couldn't Copy" when copying a photo link
+
+**Cause:** the link did not reach the clipboard. The phone only shows **Link Copied** when the
+copy really happened, so this bubble means there is nothing to paste.
+
+**Fix:** try again. Nothing is lost: the photo and its link stay in the camera roll.
 
 ## The 3D model
 

@@ -3,16 +3,16 @@
 ## Nothing to import
 
 The schema builds itself. `server/db/schema.lua` runs at every start of the resource and
-creates the 26 tables it needs. On success it prints:
+creates the 27 tables it needs. On success it prints:
 
 ```
-[nash_phone] schéma DB prêt (26 tables).
+[nash_phone] schéma DB prêt (27 tables).
 ```
 
 If it also had catching up to do, the same line reports it:
 
 ```
-[nash_phone] schéma DB prêt (26 tables, 4 colonne(s) ajoutée(s), 2 index ajouté(s)).
+[nash_phone] schéma DB prêt (27 tables, 4 colonne(s) ajoutée(s), 2 index ajouté(s)).
 ```
 
 `sql/nash_phone.sql` contains the same `CREATE TABLE` statements. **It is not read by the
@@ -26,7 +26,7 @@ that need them answer with errors.
 
 ## Tables
 
-All 26 tables are prefixed `nash_phone_`. Every per-character table is keyed on `owner`, the
+All 27 tables are prefixed `nash_phone_`. Every per-character table is keyed on `owner`, the
 identifier returned by your framework (ESX license, QB citizenid).
 
 ### Device and player
@@ -37,6 +37,7 @@ identifier returned by your framework (ESX license, QB citizenid).
 | `nash_phone_settings` | All per-player settings, one JSON blob per character |
 | `nash_phone_home` | Home screen: page layout, dock, installed applications |
 | `nash_phone_setup` | First-open setup wizard: `step` is stored from the first screen, so a player who disconnects mid-way resumes where they left off |
+| `nash_phone_faceid` | Which character's face each phone recognises: `device` (the item's serial number) → `owner`. One face per phone, the first character to use it keeps it. See [Settings > Face ID](../apps/README.md#system) |
 | `nash_phone_screentime` | Real screen time, one row per character and per day |
 
 ### Communication
@@ -53,10 +54,23 @@ identifier returned by your framework (ESX license, QB citizenid).
 
 | Table | Purpose |
 |---|---|
-| `nash_phone_gallery` | Photos and videos. Stores the hosted **URL**, never the file. `kind` is `photo` or `video` |
+| `nash_phone_gallery` | Photos and videos. Stores the hosted **URL**, never the file. `kind` is `photo` or `video`; `album` says where the media came from (see below) |
 | `nash_phone_notifications` | Phone notifications, purged on a schedule (`Config.Notifications`) |
 | `nash_phone_appdata` | Notes, Calendar, Reminders and Mail content: one JSON blob per character and per app |
 | `nash_phone_bank` | Wallet ledger shown in the phone |
+
+The `album` column of `nash_phone_gallery` records where a media came from:
+
+| `album` | Written by |
+|---|---|
+| `Camera` | The Camera, the Snapz save button, custom apps and the `SaveToGallery` export. It is also the column's default |
+| `Import` | A photo a player added from a link in Photos. Its address is always on a host listed in `Config.Gallery.Import.AllowedHosts` (Fivemanage by default), never a Discord link |
+| `AirDrop` | A photo or video received from a nearby player and accepted |
+
+The **Recently Saved** collection of Photos lists the `Import` and `AirDrop` rows. **Duplicate**
+in Photos writes a new row with the same `url`, `thumb`, `album` and `created_at` as the
+original: two rows, one hosted file. Deleting a row never deletes the file from the host. No new
+column was needed: `album` has existed since the first release, as `VARCHAR(64)`.
 
 ### byCloud account
 
@@ -100,8 +114,8 @@ why `server/db/schema.lua` holds four separate lists, not one.
 
 | List | What it does | When it acts |
 |---|---|---|
-| `DDL` | The 26 `CREATE TABLE IF NOT EXISTS` statements | Creates missing tables. Skips existing ones entirely |
-| `COLUMNS` | 20 `{ table, column, definition }` entries | Adds any column that is missing, on fresh **and** existing databases |
+| `DDL` | The 27 `CREATE TABLE IF NOT EXISTS` statements | Creates missing tables. Skips existing ones entirely |
+| `COLUMNS` | 22 `{ table, column, definition }` entries | Adds any column that is missing, on fresh **and** existing databases |
 | `INDEXES` | 9 `{ table, index, columns }` entries | Adds any index that is missing |
 | `TYPES` | 2 `{ table, column, expected type, definition }` entries | **Widens** a column that exists but is too narrow. Never narrows one |
 
@@ -129,6 +143,8 @@ the INSERT fail in strict mode and the post was refused without a word. `TYPES` 
 | `nash_phone_social_accounts` | `display_name`, `avatar_url`, `bio`, `private`, `map_share` | Social profile, private account, and map sharing (`0` never answered, `1` ghost, `2` friends) |
 | `nash_phone_social_messages` | `ephemeral`, `opened_at`, `mtype` | Snaps and shared posts |
 | `nash_phone_icloud` | `first_name`, `last_name`, `age`, `owner` | Identity asked by the setup wizard, and the character who created the account |
+| `nash_phone_setup` | `device` | Serial number of the phone the setup was done on, so a new phone asks for it again |
+| `nash_phone_phones` | `announced` | Whether `nash-phone:phoneNumberGenerated` has fired for that number. Existing rows default to `1`, so no event fires for them after the update |
 
 ### Indexes added after first release
 
@@ -174,10 +190,11 @@ costs you.
 ```
 
 {% hint style="info" %}
-`/phoneschema` currently checks 24 of the 26 tables. It reports `nash_phone_setup` and
-`nash_phone_service_requests` as `en trop` ("unknown table, probably from an older
-version"). They are neither unknown nor old: both are created by `server/db/schema.lua` and
-are in active use. **Do not drop them.**
+`/phoneschema` reports any `nash_phone_` table it does not know as `en trop` ("unknown
+table, probably from an older version"). All 27 tables above are known to it. If an older
+version of the command reports `nash_phone_setup`, `nash_phone_service_requests` or
+`nash_phone_faceid` that way, it is wrong: all three are created by `server/db/schema.lua`
+and are in active use. **Do not drop them.**
 {% endhint %}
 
 `/phonebase` prints a real `COUNT(*)` per table, all characters included: useful to spot a

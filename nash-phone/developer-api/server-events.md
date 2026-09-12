@@ -223,6 +223,8 @@ end)
 
 **Note:** despite the name this fires on every bootstrap, not only when the number actually changes. It is the reliable signal for "this player's phone number is now readable". The same value is on the state bag `Player(source).state.phoneNumber`.
 
+A bootstrap runs once when the character is loaded, before the phone is ever opened, then again at each opening. Expect this event several times per session, and keep your handler safe to run more than once.
+
 </details>
 
 <details>
@@ -240,6 +242,10 @@ end)
 **Parameters:** same as `nash-phone:numberChanged`.
 
 **Order:** `numberChanged` fires first, then `phoneNumberGenerated`. A handler on both will see both for a brand new character.
+
+**When:** as soon as the character is loaded by your framework, not when the player first opens the phone. It fires exactly once per character, even across server restarts.
+
+**Created while offline:** a number can be created for a character who is not connected, for example when another resource calls an export with that character's identifier. The event then fires at that character's next connection, with a valid `source`, so a starter item or a welcome message still reaches them.
 
 </details>
 
@@ -277,6 +283,38 @@ end)
 **Note:** the passcode is deliberately **not** in the payload. Setup writes everything at once at the end, so this event fires exactly once per character; a player who abandons midway leaves no half-configured phone and fires nothing.
 
 Setup can be replayed for a character with `Setup.reinitialiser(owner)` server-side, or with the `/phonesetupreset` test command.
+
+</details>
+
+<details>
+
+<summary>nash-phone:deviceChanged</summary>
+
+The player opened a **different handset** from the one their setup was done on. The setup row has just been reset, so `nash-phone:setupCompleted` will fire again once they finish.
+
+```lua
+AddEventHandler('nash-phone:deviceChanged', function(source, data)
+    -- data.owner, data.device
+end)
+```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `source` | `number` | Player server ID |
+| `data` | `table` | See below |
+
+**`data` fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `owner` | `string` | Framework identifier of the character |
+| `device` | `string` | Serial of the new handset, now recorded for this character |
+
+**Note:** this does **not** fire the first time a serial is read on a phone that already existed. That one is adopted silently, so an update does not wake the setup up for every player on the server. Only a genuinely different device fires it.
+
+It also never fires with `Config.UseItem = false`, or on an inventory that cannot keep data per item instance: there is nothing to compare. See [Custom Inventory](../compatibility/custom-inventory.md).
 
 </details>
 

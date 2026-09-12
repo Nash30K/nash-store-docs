@@ -34,7 +34,7 @@ nash_phone/
 ├── assets/prop/       # the coloured shells of the 3D model
 ├── custom_app_bridge/ # bridge for third-party applications
 ├── web/build/         # the compiled interface
-└── README.md  LANGUES.md  CUSTOM_APPS.md
+└── README.md  LANGUES.md
 ```
 
 ## Load order

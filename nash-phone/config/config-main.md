@@ -75,9 +75,9 @@ Config.VideoCall = {
 |---|---|---|---|---|
 | `enabled` | `boolean` | `true` | - | `false` keeps video calls audio-only, with no image |
 | `debug` | `boolean` | `false` | - | Writes each step of the call into the player's F8 console, from opening the camera to the connection state |
-| `longEdgePx` | `number` | `640` | 160 – 1280 | Long edge of the stream sent. Above 640 the thumbnail gains nothing visible and bandwidth climbs |
-| `fps` | `number` | `24` | 5 – 30 | Frames per second sent |
-| `framing` | `number` | `0.35` | 0.05 – 0.95 | Where to aim inside the game image in selfie mode |
+| `longEdgePx` | `number` | `640` | 160 to 1280 | Long edge of the stream sent. Above 640 the thumbnail gains nothing visible and bandwidth climbs |
+| `fps` | `number` | `24` | 5 to 30 | Frames per second sent |
+| `framing` | `number` | `0.35` | 0.05 to 0.95 | Where to aim inside the game image in selfie mode |
 | `iceServers` | `table` | one Google STUN entry | - | Servers that help the two players find each other |
 
 Values outside the accepted range are clamped, not refused.
@@ -512,7 +512,7 @@ Config.Music = {
 | Key | Type | Value in `main.lua` | Fallback used at runtime | Description |
 |---|---|---|---|---|
 | `distance` | `number` | `12.0` | `12.0` | Listening range in metres (proximity audio) |
-| `defaultVolume` | `number` | `0.4` | `0.4` | Starting volume, `0.0` – `1.0` |
+| `defaultVolume` | `number` | `0.4` | `0.4` | Starting volume, `0.0` to `1.0` |
 | `maxVolume` | `number` | `1.0` | `1.0` | Ceiling the player can reach |
 | `stopOnDeath` | `boolean` | `true` | on | Cut the music when the player dies |
 
@@ -582,7 +582,7 @@ Config.Camera = {
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `LongEdgePx` | `number` | `1920` | Long edge of the picture file, in pixels |
-| `Quality` | `number` | `0.8` | WebP quality, `0.0` – `1.0` |
+| `Quality` | `number` | `0.8` | WebP quality, `0.0` to `1.0` |
 
 The aspect ratio comes from the mode chosen in the app (3:4 in photo, 4:3 in landscape) and
 `LongEdgePx` sets the long side: `1920` gives 1440×1920 in photo and 1920×1440 in landscape,
@@ -595,7 +595,7 @@ The aspect ratio comes from the mode chosen in the app (3:4 in photo, 4:3 in lan
 | `MaxDurationSeconds` | `number` | `30` | - | Maximum length of a video; recording stops on its own |
 | `Fps` | `number` | `30` | - | Frames per second captured |
 | `Bitrate` | `number` | `1200000` | - | Video bitrate in bit/s. Roughly 150 KB per second of film |
-| `LongEdgePx` | `number` | `720` | 240 – 1080 | Long edge of the **video**, in pixels. The ratio comes from the mode (3:4), so `720` means 540×720 |
+| `LongEdgePx` | `number` | `720` | 240 to 1080 | Long edge of the **video**, in pixels. The ratio comes from the mode (3:4), so `720` means 540×720 |
 | `Microphone` | `boolean` | `true` | - | Record the voice of the player filming |
 
 {% hint style="warning" %}
@@ -610,3 +610,95 @@ The player's **microphone** can be recorded onto the video, like a vlog. The **g
 cannot: the embedded browser never receives GTA's audio mix. `Microphone = false` removes the
 option entirely and the microphone button disappears from the app; either way the player can
 mute before each take.
+
+## Adding photos by link
+
+Players can add a picture to Photos by pasting a link, with the **+** button of the Albums tab
+(Collections in French). The picture is downloaded **by the player's game**, checked,
+re-encoded and uploaded to the host configured in [config/upload.lua](config-upload.md), the
+same way as a camera photo. The server never downloads the pasted link: it only checks where
+the final file is stored, then saves the row. A Discord link is therefore never stored as it
+is, which matters because it would expire after 24 hours.
+
+```lua
+Config.Gallery = {
+    Import = {
+        Enabled = true,
+        MaxMegabytes = 15,
+        MaxSidePx = 8192,
+        AllowedHosts = { 'fivemanage.com' },
+    },
+}
+```
+
+| Key | Type | Default | Accepted range | Description |
+|---|---|---|---|---|
+| `Import.Enabled` | `boolean` | `true` | - | `false` hides the **+** button, and the server refuses imports. Copy, Duplicate and the Recently Saved collection are not affected |
+| `Import.MaxMegabytes` | `number` | `15` | 1 to 50 | Heaviest original file accepted, in megabytes. The player's error message quotes this number |
+| `Import.MaxSidePx` | `number` | `8192` | 1024 to 16384 | Largest width or height of the original accepted, in pixels. Read from the file header, before the picture is decoded |
+| `Import.AllowedHosts` | `table` | `{ 'fivemanage.com' }` | - | Hosts where the server agrees to **store** an imported picture. Each entry also covers its subdomains, so `fivemanage.com` covers `r2.fivemanage.com`. The address must be `https` |
+
+Values outside the accepted range are brought back to the nearest bound, not refused: a
+`MaxMegabytes = 0` left by mistake gives 1 MB, not a feature that silently refuses every
+picture. A value that is not a number falls back to the default.
+
+If your `config/main.lua` comes from an older version and has no `Config.Gallery` block at all,
+adding by link is **on**, with the defaults above. Paste the block in to change them.
+
+The **+** button only appears when `Enabled` is `true` **and** an image host is configured in
+`config/upload.lua`: without a host there is nowhere to put the file.
+
+The picture itself follows the [Camera](#camera) settings: saved as WebP, long edge at most
+`Camera.Photo.LongEdgePx`, quality `Camera.Photo.Quality`. A smaller picture is not enlarged.
+Re-encoding removes the EXIF metadata (GPS position included), and an animated GIF keeps only
+its first frame. Accepted formats are JPEG, PNG, GIF and WebP, recognised from the content of
+the file rather than from its name.
+
+Each import costs up to two uploads (the picture and its thumbnail) out of the 12 per minute a
+player is allowed: it is the same counter as the Camera. A link that is already on Fivemanage is
+re-hosted like any other: Fivemanage serves every account's files from the same addresses, so
+the phone cannot tell your files from another server's.
+
+**About `MaxSidePx`.** A file can be light in bytes and enormous in pixels. Decoding it to
+re-encode it takes 4 bytes per pixel in memory, in a browser that shares that memory with the
+game. That is why the dimensions are read from the file header first, and a picture over the
+limit is refused before anything is decoded. On top of this setting, the phone refuses any
+picture above **50 million pixels** in total (about 200 MB once decoded): 8192×6000 goes
+through, 8192×8192 does not. Raising `MaxSidePx` gains nothing visible, since every picture is
+brought down to `LongEdgePx` anyway.
+
+**About `MaxMegabytes`.** The download runs on the player's own connection and in the game's
+memory, and gives up after 20 seconds. 15 MB is comfortably above a typical photo shared on
+Discord.
+
+### `AllowedHosts` and a custom Fivemanage domain
+
+`AllowedHosts` lists where imported files may be **stored**, not where players may copy links
+from. Any link the player's game can download can be imported, Discord included, because the
+file is always re-hosted before it is saved.
+
+The default covers Fivemanage's own addresses (`r2.fivemanage.com` and any other subdomain of
+`fivemanage.com`). If your Fivemanage account serves your files from a **custom domain**,
+uploads come back with addresses on that domain, and the server refuses them until you list it:
+
+```lua
+AllowedHosts = { 'fivemanage.com', 'media.yourserver.com' },
+```
+
+Without that line, every import fails at the very last step, after the file was uploaded. The
+player gets "Something went wrong. Try again.", the uploaded file stays unused in your
+Fivemanage storage, and the Camera keeps working, because it does not go through this check.
+That combination is the tell-tale sign.
+
+**How entries are read.** Write host names only. What an owner naturally types is tolerated and
+cleaned up: capital letters, a leading `https://`, a trailing path or slash, a leading `*.`. An
+entry with no dot at all (`'com'`) is ignored, since it would open a whole top-level domain, and
+the server console lists every ignored entry at startup. A list that ends up empty falls back to
+`fivemanage.com`, with a warning: to turn the feature off, use `Enabled = false`, not an empty
+list. The stored address itself may not carry a port or an `@`.
+
+{% hint style="warning" %}
+List only hosts that serve **your** files. On a host listed here, a modified client can save any
+address directly and skip every check the phone makes (format, size, re-encoding). Never add
+Discord: its links expire after 24 hours, and `nashphone_cleanup` deletes them.
+{% endhint %}

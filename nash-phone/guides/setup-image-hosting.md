@@ -1,11 +1,13 @@
 # Set up image hosting
 
-Give the phone somewhere to store pictures, so the camera, the gallery, profile pictures and
-every social post that carries an image can actually save something.
+Give the phone somewhere to store pictures, so the camera, the gallery, profile pictures,
+every social post that carries an image, and the pictures players add from a link can
+actually save something.
 
 {% hint style="danger" %}
 This is **mandatory**. While `config/upload.lua` is empty, the camera refuses to take pictures,
-warns the player on screen, and the server prints a red banner at every start.
+warns the player on screen, Photos hides its **+** button (add a picture from a link), and the
+server prints a red banner at every start.
 {% endhint %}
 
 ## Prerequisites
@@ -80,8 +82,11 @@ restart nash_phone
 2. Open the Camera in game and take a picture. It appears in the gallery, and the thumbnail
    loads.
 3. Reconnect and open the gallery again. The picture is still there: that is what tells you
-   the link is permanent and not a session artefact.
-4. With `Config.Debug = true` in `config/main.lua`:
+   the link is stored in the database and not a session artefact.
+4. In Photos, open the **Albums** tab: the **+** button at the top is there. It only appears
+   when the phone sees a host. Tap it and paste the link of any picture: the picture lands in
+   the Library and in **Recently Saved**.
+5. With `Config.Debug = true` in `config/main.lua`:
 
     ```
     /phonedeps    -> tells you whether screenshot-basic is started
@@ -110,11 +115,15 @@ pictures do land in the channel, display perfectly… and the entire camera roll
 grid of broken thumbnails the next day. That failure is invisible at install time, which is
 why the mode was removed rather than left in place behind a warning.
 
-Fivemanage returns a permanent address, with no parameter and no signature:
+Fivemanage returns an address with no parameter, no signature and no expiry of its own:
 
 ```
 https://r2.fivemanage.com/image/gLxgYgvTZe99.png
 ```
+
+This does not stop players from using Discord pictures. The **+** button of Photos takes a
+Discord link, downloads the picture while the link still works, and re-hosts it on your
+Fivemanage storage. The Discord link itself is never stored.
 
 ### Cleaning up media left over from a webhook install
 
@@ -132,12 +141,29 @@ prints how many media rows are affected and how many players they belong to. Wit
 deletes those gallery rows, and converts image messages pointing at the same addresses back
 into text so the conversation keeps its trace instead of showing an empty bubble.
 
+Pictures players added by link are never affected, even when they pasted a Discord link: they
+were re-hosted on Fivemanage before being saved, so their address never points at Discord.
+
 ## Upload limits
 
 Uploads are rate-limited per player, and both halves of an upload share one counter:
 **12 uploads per minute per player**. The limit exists because removing the key from the
 client prevents *reading* it, not *using* it: each upload request consumes your Fivemanage
 quota whether or not a file follows.
+
+Adding a photo by link uses the same host, the same counter and the same Fivemanage quota as
+the camera: each import asks for up to two presigned addresses, one for the picture and one for
+its thumbnail.
+
+## How long links last
+
+The address itself never expires, but the file behind it lives only as long as your
+Fivemanage account keeps it. With no retention policy on the account, files stay until you
+delete them. With one (7, 30, 90, 180 or 365 days, set per media type in the Fivemanage
+dashboard), older files are deleted for good, camera photos and imported pictures alike, and
+the camera roll shows a crossed-out picture in their place. A link a player copied out of the
+phone and pasted into Discord follows the same rule. Details in
+[Image Hosting](../installation/image-hosting.md#how-long-links-last).
 
 ## Related settings
 
@@ -168,3 +194,8 @@ same and gets spread over more pixels. Drop to 480 on a heavily loaded server.
 Game audio cannot be recorded: the embedded browser never receives GTA's audio mix. Only the
 player's microphone can be. `Microphone = false` removes the option entirely.
 {% endhint %}
+
+Adding photos by link has its own block in the same file, `Config.Gallery.Import`: on or off,
+the size limits, and the hosts where imported pictures may be stored. The shipped values work
+as they are. The one case that needs a change is a Fivemanage account serving files from a
+custom domain: see [config/main.lua](../config/config-main.md#allowedhosts-and-a-custom-fivemanage-domain).
