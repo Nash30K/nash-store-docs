@@ -1,6 +1,6 @@
 # Configuration Files Overview
 
-NASH Phone is split into **12 configuration files**, each focused on one area. All of them
+NASH Phone is split into **13 configuration files**, each focused on one area. All of them
 live in `nash_phone/config/`.
 
 | File | Purpose |
@@ -17,6 +17,7 @@ live in `nash_phone/config/`.
 | [`services.lua`](config-services.md) | Services app: the businesses citizens can call |
 | [`setup.lua`](config-setup.md) | First-launch setup flow (hello, language, byCloud, Face ID, passcode) |
 | [`upload.lua`](config-upload.md) | Image and video hosting: **server-side only, holds an API key** |
+| [`logs.lua`](config-logs.md) | Discord and Fivemanage logs, admin and public: **server-side only, holds webhooks** |
 
 ## Load order
 
@@ -24,9 +25,9 @@ live in `nash_phone/config/`.
 `main.lua` creates the `Config` table, and every other file adds to it. Moving a file above
 `main.lua`, or removing `main.lua`, breaks the ones that come after it.
 
-`config/upload.lua` is the exception: it is declared in `server_scripts` and must stay there.
-It holds an image-hosting API key, and every shared script is downloaded into each connecting
-player's cache.
+`config/upload.lua` and `config/logs.lua` are the exceptions: they are declared in
+`server_scripts` and must stay there. They hold an image-hosting API key and your log webhooks,
+and every shared script is downloaded into each connecting player's cache.
 
 {% hint style="warning" %}
 `config/music.lua` assigns `Config.Music` as a whole, and it is loaded **after**

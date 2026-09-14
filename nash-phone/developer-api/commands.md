@@ -204,6 +204,7 @@ A player who passes none of them gets an explicit refusal, not silence.
 | `/phonedeps` | State of the dependencies, and what stops working without each |
 | `/phoneconfig` | Summary of the configuration as the server actually read it |
 | `/phonebase` | Row count per table, all characters combined |
+| `/phonelogtest [event]` | Sends one sample log per active event of [config/logs.lua](../config/config-logs.md), or only the event named |
 
 `/phonecheck` and `/phonedeps` are the two to run first on any install ticket: the former names the blocker, the latter tells you which optional resource is missing and what it costs you.
 

@@ -78,6 +78,7 @@
     * [config/music.lua](nash-phone/config/config-music.md)
     * [config/services.lua](nash-phone/config/config-services.md)
     * [config/upload.lua](nash-phone/config/config-upload.md)
+    * [config/logs.lua](nash-phone/config/config-logs.md)
     * [config/setup.lua](nash-phone/config/config-setup.md)
     * [config/custom\_apps.lua](nash-phone/config/config-custom-apps.md)
   * [Applications](nash-phone/apps/README.md)

@@ -13,6 +13,12 @@ Photos can now add a picture from a link, and copy the link of a photo or video.
 
 ### Added
 
+- **Discord and Fivemanage logs** in the new `config/logs.lua`, server-side only. Admin logs
+  carry the player's identity (character name, server ID, number, identifier, Discord mention);
+  public logs carry the content only, to feed roleplay channels with posts, stories, live streams
+  and service requests. Nineteen events, each with its own webhook, colour, embed or plain text,
+  and picture. `/phonelogtest` sends a sample of each. See
+  [config/logs.lua](config/config-logs.md).
 - **Add a photo from a link.** The **+** button of the Albums tab in Photos opens an
   **Add Photo by URL** alert. The player pastes a link, Discord included, and the picture lands
   in the camera roll. The player's game downloads it, checks it (JPEG, PNG, GIF or WebP,

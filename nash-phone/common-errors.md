@@ -778,6 +778,25 @@ nothing about the database.
 `aucune reponse (verifie mysql_connection_string)` when it fails. Fix
 `set mysql_connection_string` in `server.cfg` and restart.
 
+## Logs
+
+### `[nash_phone] Logs : Discord a refusé un envoi (HTTP 404). Vérifiez le lien du webhook dans config/logs.lua.`
+
+**Cause:** Discord refused a log. HTTP 404: the webhook was deleted or the link is incomplete.
+HTTP 401: the token part of the link is wrong. HTTP 400: Discord rejected the message itself.
+
+**Fix:** copy the webhook link again from the channel settings (**Integrations** → **Webhooks**)
+into `config/logs.lua`, restart the resource and run `/phonelogtest`. The line is printed at most
+once every five minutes per webhook. See [config/logs.lua](config/config-logs.md).
+
+### `[nash_phone] Logs : Fivemanage a refusé un envoi (HTTP 401). Vérifiez fivemanageKey et dataset dans config/logs.lua.`
+
+**Cause:** the Fivemanage token is wrong, or it does not cover logs. When `admin.fivemanageKey`
+is empty, the media key of `config/upload.lua` is used, and a media-only token is refused.
+
+**Fix:** create a token with access to logs in your Fivemanage dashboard, set it in
+`admin.fivemanageKey`, check `admin.dataset`, and restart the resource.
+
 ## Related
 
 - [FAQ](faq.md): the questions behind most of these fixes
