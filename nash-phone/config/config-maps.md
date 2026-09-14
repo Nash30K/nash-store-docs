@@ -16,50 +16,56 @@ paste below is printed in your own client console (F8). See [Reading a
 position](#reading-a-position).
 {% endhint %}
 
+## The map itself
+
+The map is not stored in the resource. The Maps app, the Snapz map and the location bubbles in
+Messages load Rockstar's own GTA V map tiles on the fly, the ones behind the Social Club map
+(`s.rsg.sc`). Players switch between three styles with the layers button above the zoom
+controls: **satellite**, **game map** and **paper map**. The choice is saved with the player's
+settings.
+
+{% hint style="warning" %}
+**The map needs internet access.** Each player's game downloads the tiles when a map opens, then
+keeps them in cache. If Rockstar's servers cannot be reached, the map stays a plain colour, while
+places, the player's position and the GPS keep working. None of the three styles shows street
+names.
+{% endhint %}
+
 ## Config.Map.Bounds
 
-Used to convert game coordinates into a 0-100% position on the map tiles. It serves both the
-places of the Maps app **and** location sharing in Messages.
+Used to convert game coordinates into a 0-100% position on the map. It serves the places of the
+Maps app, the Snapz map **and** location sharing in Messages.
 
 ```lua
 Config.Map.Bounds = {
-    minX = -5718.2,
-    maxX = 6776.7,
-    minY = -4083.1,
-    maxY = 8411.8,
+    minX = -4149.5,
+    maxX = 4889.2,
+    minY = -5140.5,
+    maxY = 8417.6,
 }
 ```
 
 {% hint style="warning" %}
-**The two spans must stay equal.** The map tiles are square: one tile covers as many metres
-wide as it does tall. If `maxX - minX` differs from `maxY - minY`, the projection stretches one
-axis and places drift the further they sit from the centre. The shipped values are
-12494.9 x 12494.9.
+**Do not change these values.** They describe the grid of Rockstar's map tiles, which is not
+square: the map is one and a half times taller than it is wide, so `maxY - minY` must stay equal
+to 1.5 × `maxX - minX` (shipped: 9038.7 × 13558.1). Any other value moves every place, and the
+player's own position, away from where it really is.
 {% endhint %}
 
 {% hint style="info" %}
-**These numbers are measured, not estimated.** They come from six landmarks located on the
-tiles themselves (Maze Bank Tower, Legion Square, the La Mesa Los Santos Customs, the central
-hospital, the Fort Zancudo control tower, the Mount Chiliad summit) matched against their game
-coordinates. Los Santos International Airport was deliberately kept **out** of that
-calculation and used as a control: it lands on its terminal. The remaining error is 10 to 25
-metres in the city.
-
-Change them only if your server actually uses a different map. Nudging them "to see" will
-undo a calibration you cannot easily redo by eye.
+**These numbers are measured, not estimated.** They come from matching the coastline of
+Rockstar's tiles against a map calibrated in game, then checking seven landmarks: Maze Bank
+Tower, Legion Square, the La Mesa Los Santos Customs, the central hospital, the Fort Zancudo
+control tower, the Mount Chiliad summit and Los Santos International Airport. Each one lands on
+its building, within 25 metres.
 {% endhint %}
 
-To fine-tune: stand somewhere very recognisable, run `/phonepos`, add the place to the list
-below and open Maps. If the dot lands off target, shift **both** bounds of the same axis
-together (for example `minX` and `maxX` by +200 each) so you do not reintroduce a stretch.
-
 If the block is missing, or degenerate (`minX == maxX`, or `minY == maxY`), the phone falls
-back to the same measured values internally, so a deleted block no longer produces a wrong
-map. Keep the block anyway: it is the only place you can adapt the phone to a custom map.
+back to the same values internally, so a deleted block does not produce a wrong map.
 
 With `Config.Debug = true` in [config/main.lua](config-main.md), `/phoneconfig` prints the
-computed width and height and says whether they are square, and `/phonecheck` lists non-square
-bounds among the things preventing the phone from working properly.
+computed width and height and says whether they respect the proportion of the tiles, and
+`/phonecheck` lists wrong bounds among the things preventing the phone from working properly.
 
 ## Config.Map.Travel
 

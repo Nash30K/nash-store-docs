@@ -51,6 +51,6 @@ read back what the server actually resolved:
 | Command | What it prints |
 | ------- | -------------- |
 | `/phoneconfig` | The configuration as the server read it: language, item, phone numbers, NearShare, speaker, camera, apps turned off |
-| `/phonecheck` | A short verdict: missing dependencies, missing item, no upload host, disabled apps others depend on, non-square map bounds, phone numbers too long for the column |
+| `/phonecheck` | A short verdict: missing dependencies, missing item, no upload host, disabled apps others depend on, map bounds that break the proportion of the tiles, phone numbers too long for the column |
 
 Leave `Config.Debug` at `false` on a live server.

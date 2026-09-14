@@ -38,6 +38,17 @@ Photos can now add a picture from a link, and copy the link of a photo or video.
   viewfinder, with the lens tint and night mode applied. See
   [Snapz](apps/README.md#taking-a-snap).
 
+### Changed
+
+- **The map no longer ships with the resource.** Maps, the Snapz map and the location bubbles in
+  Messages load Rockstar's own GTA V map tiles online, in three styles the player switches with a
+  new layers button: satellite, game map and paper map. The resource is about 31 MB lighter and
+  the map is sharper at full zoom; street names are no longer drawn on it, and players need
+  internet access for the map to show. See [config/maps.lua](config/config-maps.md#the-map-itself).
+- **`Config.Map.Bounds` has new values** (`minX = -4149.5`, `maxX = 4889.2`, `minY = -5140.5`,
+  `maxY = 8417.6`), calibrated on Rockstar's tiles. A `config/maps.lua` kept from an earlier
+  version must take them, or places land off target.
+
 ### Fixed
 
 - **Snapz snaps.** Taking a snap used to screenshot the whole screen, which hides the phone and

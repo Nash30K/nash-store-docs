@@ -544,10 +544,12 @@ Points of interest on the city map, with distance and travel time computed from 
 
 **Real.** Selecting a place sets an actual GTA waypoint. Everything the player sees is configured in `config/maps.lua`; nothing is hard-coded in the screens.
 
-**World bounds** convert game coordinates into a 0..100% position on the tiles, and are also used by location sharing in Messages. Shipped as `minX = -5730.0`, `maxX = 6270.0`, `minY = -4000.0`, `maxY = 8000.0`.
+**The map** is Rockstar's own GTA V map, loaded online when a map opens, so nothing is stored in the resource. The player switches between three styles with the layers button: satellite, game map and paper map, and the choice is saved with their settings. Without access to Rockstar's servers the map stays a plain colour, while places, position and GPS keep working. No style shows street names.
+
+**World bounds** convert game coordinates into a 0-100% position on the map, and are also used by the Snapz map and location sharing in Messages. Shipped as `minX = -4149.5`, `maxX = 4889.2`, `minY = -5140.5`, `maxY = 8417.6`.
 
 {% hint style="warning" %}
-The two spans must stay equal. Map tiles are square: one tile covers as many metres wide as tall. If `maxX - minX` differs from `maxY - minY`, the projection stretches one axis and places drift further the further they are from the centre. Here both spans are 12000. To fine-tune, shift **both** bounds of the same axis by the same amount.
+Do not change the bounds. They match the grid of Rockstar's tiles, one and a half times taller than wide (`maxY - minY` = 1.5 × `maxX - minX`), calibrated within 25 metres on seven landmarks. Any other value moves every place away from its real spot.
 {% endhint %}
 
 **Travel estimates** (`Config.Map.Travel`): `roadFactor = 1.35` (1.0 would be straight-line), `speedKmh = 50.0`, `refreshSeconds = 5` while the app is open.

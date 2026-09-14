@@ -116,31 +116,26 @@ car       tools     cash     ticket    beach    school    star     flag
 bag
 ```
 
-## 4. Check the world bounds
+## 4. Leave the world bounds as they are
 
-`Config.Map.Bounds` converts game coordinates into a 0–100 % position on the map tiles. It is
-used both by the Maps app and by location sharing in Messages.
+`Config.Map.Bounds` converts game coordinates into a 0-100% position on the map. It is used by
+the Maps app, the Snapz map and location sharing in Messages.
 
 ```lua
 Config.Map.Bounds = {
-    minX = -5730.0,
-    maxX = 6270.0,
-    minY = -4000.0,
-    maxY = 8000.0,
+    minX = -4149.5,
+    maxX = 4889.2,
+    minY = -5140.5,
+    maxY = 8417.6,
 }
 ```
 
 {% hint style="danger" %}
-**The two spans must stay equal.** Map tiles are square: one tile covers as many metres wide
-as it does tall. If `maxX - minX` differs from `maxY - minY`, the projection stretches one
-axis and locations drift further off the further they are from the centre. The shipped values
-are 12000 × 12000.
-
-To fine-tune, shift **both** bounds of the same axis together (for example `minX` and `maxX`
-by +200 each) so you do not reintroduce a stretch.
+**Do not change these values.** They match the grid of the Rockstar map tiles the phone loads,
+which is one and a half times taller than it is wide: `maxY - minY` must stay equal to
+1.5 × `maxX - minX`. Changing them moves every location away from its real spot. Your own
+locations only need correct `coords`.
 {% endhint %}
-
-You only need to touch this if you run a custom map whose world extends beyond the base game.
 
 ## 5. Tune the travel estimate
 
@@ -163,13 +158,14 @@ Config.Map.Travel = {
    `coords` is a `vec3` and not a string.
 3. Tap a location: the sheet shows the address, the opening state, and a Call button if you
    gave it a `phone`.
-4. To verify the projection, add a location on a very recognisable landmark and look at where
-   the pin lands on the tiles. If it is off, the bounds are wrong: not the coordinates.
+4. To verify, add a location on a very recognisable landmark and look at where the pin lands on
+   the map. With the shipped bounds it lands on the landmark: if it does not, its `coords` are
+   wrong, or the bounds were modified.
 5. With `Config.Debug = true`, `/phoneconfig` reports how many points and categories the
-   server actually read, and `/phonecheck` flags non-square bounds explicitly:
+   server actually read, and `/phonecheck` flags wrong bounds explicitly:
 
     ```
-    bornes de carte non carrees : les lieux de Plans tombent a cote.
+    bornes de carte hors proportion des tuiles : les lieux de Plans tombent a cote.
     ```
 
 {% hint style="warning" %}

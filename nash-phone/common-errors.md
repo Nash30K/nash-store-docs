@@ -574,14 +574,26 @@ config/main.lua.`
 
 ### Places in the Maps app land next to the right spot
 
-**Cause:** the two spans of `Config.Map.Bounds` are not equal. Map tiles are square: one tile
-covers as many metres across as it does down. If `maxX - minX` differs from `maxY - minY`, the
-projection stretches one axis and places drift further the further they are from the centre.
+**Cause:** `Config.Map.Bounds` was changed, or kept from a version older than the online map.
+The phone loads Rockstar's map tiles, whose grid is one and a half times taller than it is wide,
+and the shipped bounds are calibrated on that grid. Any other value moves every place and the
+player's own position.
 
-**Fix:** keep both spans equal (shipped: 12000 × 12000). To recentre, move **both** bounds of
-the same axis by the same amount so you do not reintroduce a stretch. Stand somewhere
-recognisable, run `/phonepos`, and paste the printed block into `config/maps.lua`.
-`/phonecheck` flags non-square bounds.
+**Fix:** put back the shipped values: `minX = -4149.5`, `maxX = 4889.2`, `minY = -5140.5`,
+`maxY = 8417.6`. If a single place is off while the others are right, its `coords` are wrong:
+stand on the spot, run `/phonepos`, and paste the printed block into `config/maps.lua`.
+`/phonecheck` flags bounds that break the proportion of the tiles.
+
+### The map stays a plain colour
+
+**Cause:** the player's game cannot reach Rockstar's map servers (`s.rsg.sc`): no internet on
+that machine, a firewall or an antivirus filtering the game, or an outage on Rockstar's side. The
+map is not stored in the resource, so there is nothing to fall back on.
+
+**Fix:** on the same machine, open
+`https://s.rsg.sc/sc/images/games/GTAV/map/render/0/0/0.jpg` in a browser. If it does not load,
+the problem is the connection, not the phone. Places, the player's position and the GPS keep
+working in the meantime.
 
 ### No phone number is assigned, or numbers are truncated
 
