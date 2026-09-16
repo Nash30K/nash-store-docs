@@ -13,6 +13,15 @@ Photos can now add a picture from a link, and copy the link of a photo or video.
 
 ### Added
 
+- **qs-inventory support**, auto-detected before `qb-inventory`. The phone and earbuds items are
+  registered as usable through qs-inventory itself, and each handset keeps its own serial in its
+  `info`. See [Inventory Items](installation/inventory-items.md#qs-inventory).
+- **`Config.Phone.syncFramework`** in `config/main.lua`, off by default: copies each character's
+  number into `charinfo.phone` on QBCore and QBOX, or into `users.phone_number` on ESX when that
+  column exists. See [config/main.lua](config/config-main.md#phone-numbers).
+- **`playerUnloadedEvent` and `setPhoneNumber`** in the custom framework bridge, and an optional
+  `usableItem` in the custom inventory bridge. See
+  [Custom Framework](compatibility/custom-framework.md).
 - **Discord and Fivemanage logs** in the new `config/logs.lua`, server-side only. Admin logs
   carry the player's identity (character name, server ID, number, identifier, Discord mention);
   public logs carry the content only, to feed roleplay channels with posts, stories, live streams
@@ -46,6 +55,11 @@ Photos can now add a picture from a link, and copy the link of a photo or video.
 
 ### Changed
 
+- **Death closes the phone on every framework.** QBCore and QBOX revive a dead character and
+  play an animation, so the phone now also reads their `isdead` and `inlaststand` metadata: a
+  player on the ground cannot open it, an open phone closes, and an incoming call does not open
+  it. See [Compatibility Overview](compatibility/README.md#death-closes-the-phone).
+- **`ps-inventory`** is detected with `qb-inventory` and `lj-inventory`.
 - **The map no longer ships with the resource.** Maps, the Snapz map and the location bubbles in
   Messages load Rockstar's own GTA V map tiles online, in three styles the player switches with a
   new layers button: satellite, game map and paper map. The resource is about 31 MB lighter and
@@ -57,6 +71,21 @@ Photos can now add a picture from a link, and copy the link of a photo or video.
 
 ### Fixed
 
+- **QBCore: nobody could open the phone with the item.** Current qb-core no longer has the item
+  functions on the player; the inventory bridge now asks `qb-inventory`'s exports, and falls
+  back to the player functions on older cores.
+- **QBOX: using the phone or earbuds item did nothing.** The item is now registered through
+  `exports.qbx_core:CreateUseableItem`.
+- **QBOX: administrators were not recognised** by the `/phone*` test commands. The bridge now
+  reads `exports.qbx_core:GetPermission`.
+- **Character switch on multi-character servers.** Going back to character selection now ends
+  the call in progress, stops the number from ringing that player, stops a live stream, the
+  music and duty in Services, and closes the byCloud session: the next character could read the
+  previous one's mailbox. See [Compatibility Overview](compatibility/README.md#character-switch).
+- **QBCore and QBOX: a transfer larger than the bank balance** is refused by the bridge itself,
+  since both frameworks let the bank account go negative by default.
+- **`nash_phone` started before the framework** no longer leaves the phone without a framework
+  until the next restart: detection is tried again until the core is started.
 - **Snapz snaps.** Taking a snap used to screenshot the whole screen, which hides the phone and
   closes the app: the snap never reached the caption screen.
 - **Camera: thumbnails.** The thumbnail of each photo was uploaded but not saved, so the Photos

@@ -14,17 +14,24 @@ give the wrong answer, because ESX no longer holds the items. `Config.Framework`
 | Bridge | Auto-detected | Config key | Default |
 | ------ | ------------- | ---------- | ------- |
 | **Framework** | `es_extended` (ESX) · `qb-core` (QBCore) · `qbx_core` (QBOX) | `Config.Framework` | `'auto'` |
-| **Inventory** | `ox_inventory` · `qb-inventory` / `lj-inventory` · the framework's own | `Config.Inventory` | `'auto'` |
+| **Inventory** | `ox_inventory` · `qs-inventory` · `qb-inventory` / `ps-inventory` / `lj-inventory` · the framework's own | `Config.Inventory` | `'auto'` |
 
 Both keys live in `config/bridge.lua`. In `'auto'` mode you normally have nothing to do: the
 console announces what was picked at startup.
 
-## Server-side only
+## Mostly server-side
 
-There is no framework code in `client/`. `client/bridge/nui.lua` is the NUI router, not a
-framework bridge: it forwards NUI actions to server callbacks and has nothing to do with
-ESX, QBCore or QBOX. Everything framework-related is in `server/bridge/`, which means a
-custom framework never requires a client-side change.
+Almost everything framework-related is in `server/bridge/`. The client knows the framework in
+two places only, both of them listening to events and calling nothing:
+
+| File | What it listens to | Why |
+| ---- | ------------------ | --- |
+| `client/bridge/framework.lua` | `QBCore:Player:SetPlayerData`, `qbx_core:client:onSetMetaData`, `QBCore:Client:OnPlayerLoaded` / `OnPlayerUnload` | The `isdead` and `inlaststand` metadata of QBCore and QBOX, see [Death](#death-closes-the-phone) |
+| `client/main.lua` | `esx:onPlayerLogout`, `QBCore:Client:OnPlayerUnload` | Closes the phone when a player goes back to character selection |
+
+`client/bridge/nui.lua` is the NUI router, not a framework bridge. A custom framework still
+never requires a client-side change: on a framework those events do not exist, they simply
+never fire.
 
 ## Files
 
@@ -35,7 +42,7 @@ custom framework never requires a client-side change.
 | `server/bridge/esx.lua` | ESX provider |
 | `server/bridge/qbcore.lua` | QBCore provider |
 | `server/bridge/qbox.lua` | QBOX provider |
-| `server/bridge/inventory.lua` | The `Inventory.*` interface and its three built-in providers |
+| `server/bridge/inventory.lua` | The `Inventory.*` interface and its four built-in providers |
 | `server/bridge/custom.lua` | The only file meant to be edited: custom framework **and** custom inventory |
 
 `fxmanifest.lua` loads `server/bridge/**.lua` **before** `server/main.lua`, because
@@ -99,9 +106,14 @@ A name that matches no registered provider prints the list of the ones that exis
 And when nothing at all is found:
 
 ```
-[nash_phone] AUCUN framework détecté. Le téléphone ne pourra identifier personne.
-[nash_phone] Si vous utilisez un framework maison, renseignez Config.Framework et remplissez server/bridge/custom.lua.
+[nash_phone] AUCUN framework détecté pour l'instant. Le téléphone ne pourra identifier personne.
+[nash_phone] Démarrez le core AVANT nash_phone. Framework maison : renseignez Config.Framework et remplissez server/bridge/custom.lua.
 ```
+
+A failed detection is **not** remembered. If `nash_phone` starts before the core in your
+`server.cfg`, the phone asks again on every call and works as soon as the core is started,
+without a restart. The usable items are only registered once a framework is found (it waits up
+to 60 seconds for it at startup), so start the core first all the same.
 
 {% hint style="warning" %}
 The detection order is a hard-coded list of three names. Registering your own
@@ -114,21 +126,23 @@ it. Name it in `Config.Framework`. See [Custom Framework](custom-framework.md).
 With `Config.Inventory = 'auto'`, providers are tried in this order:
 
 1. `ox`: `ox_inventory` started
-2. `qb`: `qb-inventory` **or** `lj-inventory` started
-3. `framework`: always accepts; reads the framework's native inventory
+2. `qs`: `qs-inventory` started
+3. `qb`: `qb-inventory`, `ps-inventory` **or** `lj-inventory` started
+4. `framework`: always accepts; reads the framework's native inventory
 
 ```
 [nash_phone] inventaire détecté : ox.
 ```
 
 `ox_inventory` comes first because when it runs, it holds the items regardless of the
-framework underneath. The `framework` provider is the last resort and always accepts, so
-`'auto'` never ends with "no inventory".
+framework underneath. `qs-inventory` comes before `qb-inventory` because on QBCore it replaces
+it. The `framework` provider is the last resort and always accepts, so `'auto'` never ends
+with "no inventory".
 
-Accepted values: `'auto'`, `'ox'`, `'qb'`, `'framework'`, `'custom'`. Anything else:
+Accepted values: `'auto'`, `'ox'`, `'qs'`, `'qb'`, `'framework'`, `'custom'`. Anything else:
 
 ```
-[nash_phone] Config.Inventory = "qs" : inconnu. Attendu : auto, ox, qb, framework, custom.
+[nash_phone] Config.Inventory = "codem" : inconnu. Attendu : auto, ox, qs, qb, framework, custom.
 ```
 
 The phone asks an inventory two questions and nothing more:
@@ -155,7 +169,7 @@ returns a neutral value and prints **one** warning, once:
 | --------- | -------------------------------- |
 | `getPlayer`, `identifier`, `group`, `fullName`, `job`, `usableItem` | `nil` |
 | `getBank`, `getCash` | `0` |
-| `addBank`, `removeBank` | `false` |
+| `addBank`, `removeBank`, `setPhoneNumber` | `false` |
 | `players` | `{}` |
 
 This is what lets a half-wired custom bridge still boot instead of throwing a Lua error on
@@ -165,8 +179,25 @@ bootstrap callback returns `false` without it, so the phone never opens.
 ## What the code guarantees, and what it does not
 
 The three bridges implement the same interface and every app goes through it: there is not a
-single ESX, QBCore or QBOX call outside `server/bridge/`. That is a structural guarantee, not
-a testing claim.
+single ESX, QBCore or QBOX call outside `server/bridge/`, apart from the client events listed in
+[Mostly server-side](#mostly-server-side). That is a structural guarantee, not a testing claim.
+
+## Character switch
+
+On a multi-character server, a player can go back to character selection without
+disconnecting. The phone treats it like a departure: the call in progress ends, an InstaPic
+live stream stops, the player leaves duty in Services, the music stops, the number stops
+ringing this player, and a byCloud session is closed so the next character never reads the
+previous one's mailbox. The phone itself closes on the client. The signal is `esx:playerLogout`
+on ESX and `QBCore:Server:OnPlayerUnload` on QBCore and QBOX.
+
+## Death closes the phone
+
+The rule is the same on every framework: a dead player cannot open the phone, an open phone
+closes, and an incoming call does not open it. ESX keeps a dead player dead, which the game
+sees. QBCore and QBOX revive the character and play a death animation instead, so the phone
+also reads their `isdead` and `inlaststand` metadata: a player on the ground, even in last
+stand, cannot use the phone.
 
 {% hint style="warning" %}
 ESX is the reference platform: it is the framework named in the resource's own required-
@@ -177,8 +208,9 @@ On a QBCore or QBOX server, run the checklist at the bottom of
 [QBCore](qbcore.md) / [QBOX](qbox.md) before opening.
 {% endhint %}
 
-`qs-inventory` is **not** referenced anywhere in the code and is not auto-detected. It has to
-go through [Custom Inventory](custom-inventory.md).
+`qs-inventory` has its own provider, auto-detected, built on the exports documented by Quasar.
+Other inventories go through the framework's native inventory when they replace it, or through
+[Custom Inventory](custom-inventory.md).
 
 ## Changing framework after launch
 

@@ -32,16 +32,19 @@ picks **QBOX**, not QBCore: `qbox` is tested first on purpose. See [QBOX](qbox.m
 | --------- | --------------------- |
 | `Framework.getPlayer(src)` | `QB.Functions.GetPlayer(src)` |
 | `Framework.identifier(src)` | `PlayerData.citizenid` |
-| `Framework.group(src)` | `QB.Functions.GetPermission(src)` |
+| `Framework.group(src)` | `QB.Functions.GetPermission(src)`, in the order `superadmin`, `admin`, `god`, `mod` |
 | `Framework.fullName(src)` | `PlayerData.charinfo.firstname .. ' ' .. charinfo.lastname` |
 | `Framework.getBank(src)` | `PlayerData.money.bank` |
 | `Framework.getCash(src)` | `PlayerData.money.cash` |
 | `Framework.addBank(src, amount)` | `Player.Functions.AddMoney('bank', amount, 'nash_phone')` |
-| `Framework.removeBank(src, amount)` | `Player.Functions.RemoveMoney('bank', amount, 'nash_phone')` |
+| `Framework.removeBank(src, amount)` | Balance check, then `Player.Functions.RemoveMoney('bank', amount, 'nash_phone')` |
 | `Framework.players()` | `QB.Functions.GetQBPlayers()` |
 | `Framework.usableItem(name, cb)` | `QB.Functions.CreateUseableItem(name, cb)` |
 | `Framework.job(src)` | `PlayerData.job`, flattened |
-| Native inventory: item held | `Player.Functions.GetItemByName(item).amount > 0` |
+| `Framework.setPhoneNumber(src, number)` | `charinfo.phone`, through `Player.Functions.SetPlayerData('charinfo', ...)` |
+| Character switch | `QBCore:Server:OnPlayerUnload` (server), `QBCore:Client:OnPlayerUnload` (client) |
+| Death | `PlayerData.metadata.isdead` or `inlaststand`, read on the client |
+| Native inventory: item held | `Player.Functions.GetItemByName` on older cores, `QB.Functions.HasItem(src, item)` otherwise |
 | Native inventory: item list | `QB.Shared.Items` |
 
 Money reasons are logged as `nash_phone` on both sides.
@@ -62,8 +65,10 @@ into another.
 handled:
 
 - a **string:** returned as-is;
-- a **table** such as `{ god = true, admin = true }`: scanned for `god`, `superadmin`,
-  `admin`, `mod`, in that order, and the first match is returned as the group name.
+- a **table** such as `{ god = true, admin = true }`: scanned for `superadmin`, `admin`,
+  `god`, `mod`, in that order, and the first match is returned as the group name. `admin`
+  comes before `god` because a god inherits `admin` through the principals of QBCore's
+  `server.cfg`, and `Config.DebugGroups` expects `admin`.
 
 The bridge returns `nil`, never `'user'`, when it cannot tell: refusing an admin who has just
 connected is worse than returning nothing.
@@ -75,9 +80,14 @@ to that list or use the `nash_phone.debug` ACE instead.
 ## Money
 
 `AddMoney` and `RemoveMoney` return a boolean in QBCore, and the bridge passes it straight
-through (`~= false`). QBCore refuses an overdrawn withdrawal itself and returns `false`, so the
-bridge does **not** read the balance first: doing so would open a race between the read and
-the withdrawal.
+through (`~= false`).
+
+{% hint style="warning" %}
+QBCore only refuses an overdrawn withdrawal for the money types listed in
+`QBCore.Config.Money.DontAllowMinus`, which is `{ 'cash', 'crypto' }` by default: **the bank
+account accepts a negative balance**. The bridge therefore checks the balance itself before
+`RemoveMoney`, so a phone transfer larger than the balance is refused.
+{% endhint %}
 
 The booleans matter: a phone transfer debits the sender, credits the recipient, and refunds
 the sender when the credit fails.
@@ -104,6 +114,27 @@ means you have a choice in `config/services.lua`:
 `ownDuty = false` with nothing calling the export leaves **every** service showing
 "Unavailable" forever. That is not a bug: no employee has ever been declared on duty.
 {% endhint %}
+
+## Inventory
+
+Current qb-core no longer has the item functions on the player (`Player.Functions.GetItemByName`,
+`SetItemData`, `AddItem`, `RemoveItem`): they became exports of `qb-inventory`. The inventory
+bridge asks `qb-inventory` first (`HasItem`, `GetItemByName`, `SetItemData`), then falls back to
+the player functions on older cores. `ps-inventory` and `lj-inventory` are detected the same way,
+and `qs-inventory` has its own provider. See [Custom Inventory](custom-inventory.md).
+
+## Phone number in the character data
+
+With `Config.Phone.syncFramework = true` in `config/main.lua`, the phone copies each
+character's number into `charinfo.phone`, where QBCore scripts read it. The copy overwrites the
+number QBCore generated when the character was created. Off by default.
+
+## Death and character switch
+
+A QBCore character who dies is revived and plays an animation, so the game does not see them as
+dead. The phone reads `isdead` and `inlaststand` instead: on the ground, even in last stand, the
+phone closes and cannot be opened. Going back to character selection ends the call in progress
+and closes the phone. See the [Compatibility Overview](README.md#character-switch).
 
 ## Manual steps
 
@@ -147,7 +178,7 @@ as required, not optional, before opening a QBCore server.
   store it as a JSON string will show the translated "Unknown" fallback everywhere; that needs
   a custom bridge.
 - **Non-standard permission names.** `GetPermission` returning something other than a string
-  or a `god` / `superadmin` / `admin` / `mod` table yields `nil`, and the `/phone*` test
+  or a `superadmin` / `admin` / `god` / `mod` table yields `nil`, and the `/phone*` test
   commands then only accept the `nash_phone.debug` ACE.
 - **Changing framework later orphans everything.** Phone tables are keyed on the citizenid.
   See the warning in the [Compatibility Overview](README.md).

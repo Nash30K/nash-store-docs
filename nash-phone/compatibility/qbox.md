@@ -21,8 +21,10 @@ resource; checking QBCore first would file a QBOX server under the wrong bridge 
 miss `exports.qbx_core:*` entirely. On a hybrid install, QBOX wins.
 {% endhint %}
 
-Player loading is picked up through the `QBCore:Server:OnPlayerLoaded` event, which QBOX also
-fires.
+Player loading is picked up through the `QBCore:Server:PlayerLoaded` event, which `qbx_core`
+fires from `CreatePlayer` with the player object. Going back to character selection is picked
+up through `QBCore:Server:OnPlayerUnload`, which `Logout` fires before
+`qbx_core:server:playerLoggedOut`.
 
 ## What the bridge maps
 
@@ -30,15 +32,17 @@ fires.
 | --------- | ------------------- |
 | `Framework.getPlayer(src)` | `exports.qbx_core:GetPlayer(src)`, inside a `pcall` |
 | `Framework.identifier(src)` | `PlayerData.citizenid` |
-| `Framework.group(src)` | `exports.qbx_core:HasPrimaryGroup(src, 'admin')`, then `lib.getPlayerGroup(src)` |
+| `Framework.group(src)` | `exports.qbx_core:GetPermission(src)`, in the order `superadmin`, `admin`, `god`, `mod` |
 | `Framework.fullName(src)` | `PlayerData.charinfo.firstname .. ' ' .. charinfo.lastname` |
 | `Framework.getBank(src)` | `PlayerData.money.bank` |
 | `Framework.getCash(src)` | `PlayerData.money.cash` |
 | `Framework.addBank(src, amount)` | `Player.Functions.AddMoney('bank', amount, 'nash_phone')` |
-| `Framework.removeBank(src, amount)` | `Player.Functions.RemoveMoney('bank', amount, 'nash_phone')` |
+| `Framework.removeBank(src, amount)` | Balance check, then `Player.Functions.RemoveMoney('bank', amount, 'nash_phone')` |
 | `Framework.players()` | `exports.qbx_core:GetQBPlayers()` |
-| `Framework.usableItem(name, cb)` | `exports.ox_inventory:RegisterUsableItem(name, cb)` |
+| `Framework.usableItem(name, cb)` | `exports.qbx_core:CreateUseableItem(name, cb)` |
 | `Framework.job(src)` | `PlayerData.job`, flattened like QBCore |
+| `Framework.setPhoneNumber(src, number)` | `exports.qbx_core:SetCharInfo(src, 'phone', number)` |
+| Death | `metadata.isdead` or `inlaststand`, read on the client through `qbx_core:client:onSetMetaData` |
 | Native inventory | **Not implemented:** returns `nil` on purpose |
 
 Every export call is wrapped in a `pcall`, so a QBOX version that renamed one of them degrades
@@ -52,12 +56,19 @@ and messages.
 
 ## Groups
 
-QBOX delegates permissions to `ox_lib`. The bridge tries the dedicated export first
-(`HasPrimaryGroup(src, 'admin')`, which yields the group name `'admin'` when true), then falls
-back to `lib.getPlayerGroup(src)`. It returns `nil` when neither answers.
+QBOX keeps permissions in ACEs. `exports.qbx_core:GetPermission(src)` returns a table such as
+`{ god = true, admin = true }` built from the permissions in its configuration, and the bridge
+returns the first of `superadmin`, `admin`, `god`, `mod` it finds. When the export does not
+answer, it tests the same names with `IsPlayerAceAllowed`. It returns `nil` when nothing
+matches.
+
+{% hint style="info" %}
+`HasPrimaryGroup` is **not** a permission check: it compares the player's job and gang. An
+earlier version of the bridge used it and recognised no administrator at all.
+{% endhint %}
 
 Groups gate the `/phone*` test commands through `Config.DebugGroups`, default
-`{ 'admin', 'superadmin' }`. On a QBOX server using different ox_lib group names, add them to
+`{ 'admin', 'superadmin' }`. On a QBOX server using different permission names, add them to
 that list or use the `nash_phone.debug` ACE.
 
 ## Jobs
@@ -75,17 +86,13 @@ driving `exports.nash_phone:SetServiceDuty(source, true)`. With the shipped defa
 
 ## The item, and why `ox_inventory` is effectively required
 
-QBOX does not register usable items in the core: `ox_inventory` does. The bridge therefore
-routes `Framework.usableItem` to `exports.ox_inventory:RegisterUsableItem`, and **skips the
-call entirely** when `ox_inventory` is not started.
+The bridge registers the usable item with `exports.qbx_core:CreateUseableItem`. `ox_inventory`
+reads it back through `CanUseItem` in its QBOX bridge and calls it with the player's source, so
+using the phone item from the inventory opens the phone.
 
-Consequences on a QBOX server without `ox_inventory`:
-
-- using the phone item from the inventory does nothing;
-- the phone still opens with `/phone` and the open key, provided the player carries the item;
-- `Config.Inventory = 'framework'` is a dead end, because the QBOX bridge deliberately returns
-  `nil` for both native-inventory functions. `Inventory.hasItem` only accepts a literal `true`,
-  so with `Config.UseItem = true` **nobody** would be able to open the phone.
+QBOX has no inventory of its own. `Config.Inventory = 'framework'` is a dead end: the QBOX
+bridge deliberately returns `nil` for both native-inventory functions, so with
+`Config.UseItem = true` **nobody** would be able to open the phone.
 
 {% hint style="warning" %}
 On QBOX, leave `Config.Inventory` on `'auto'` (which picks `ox_inventory`) or set it to
@@ -134,6 +141,8 @@ checklist below before opening a QBOX server.
   phone resolved the bridge. Check `server.cfg` order, or force `Config.Framework = 'qbox'`.
 - **`Config.Inventory = 'framework'` breaks item ownership.** See above: QBOX has no native
   inventory to read.
+- **`Config.Phone.syncFramework = true` overwrites `charinfo.phone`.** The number QBOX generated
+  for the character is replaced by the phone's, which is what `GetPlayerByPhone` then finds.
 - **`charinfo` must be a table.** `Framework.fullName` returns `nil` otherwise, and the
   translated "Unknown" fallback shows everywhere.
 - **Changing framework later orphans everything.** Phone tables are keyed on the citizenid.

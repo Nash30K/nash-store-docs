@@ -33,6 +33,7 @@ NashFw = NashFw or {}
 
 NashFw.custom = {
     playerLoadedEvent = 'my_core:playerLoaded',   -- or nil
+    playerUnloadedEvent = 'my_core:playerLogout', -- or nil
     detect = function() return false end,
     build  = function()
         return {
@@ -46,6 +47,7 @@ NashFw.custom = {
 | Field | Role |
 | ----- | ---- |
 | `playerLoadedEvent` | Name of the event your framework fires when a character is loaded. May be `nil` |
+| `playerUnloadedEvent` | Name of the server event fired when a player leaves their character without disconnecting. May be `nil` |
 | `detect` | Only consulted in `'auto'` mode. Leave it returning `false` |
 | `build` | Called at the **first use** of the bridge, and returns the table of functions below |
 
@@ -62,6 +64,17 @@ enough: there is no argument shape to match.
 Leave it `nil` if your framework has no such event. The phone then catches up at the first NUI
 bootstrap, slightly later: the player is hydrated when they open the phone rather than when
 they spawn.
+
+### `playerUnloadedEvent`
+
+The server event your framework fires when a player goes back to character selection without
+disconnecting, with the server ID as its **first argument**. The phone then ends the call in
+progress, stops the number from ringing this player, closes a byCloud session and takes the
+player off duty, exactly as on a disconnection.
+
+Leave it `nil` on a framework without multiple characters: a real disconnection is already
+handled by `playerDropped`. On a multi-character framework, leaving it `nil` lets the next
+character inherit the previous one's call and number until they reconnect.
 
 ## Only one function is mandatory
 
@@ -84,6 +97,7 @@ The phone still boots, which is what lets you wire the bridge in stages.
 | `job` | The Services app recognises no employee |
 | `usableItem` | The phone no longer opens from the inventory item, only from the key and `/phone` |
 | `group` | No admin command is granted (the `nash_phone.debug` ACE still works) |
+| `setPhoneNumber` | `Config.Phone.syncFramework` copies nothing into your character data |
 
 ## The interface
 
@@ -253,6 +267,25 @@ Leaving it empty only removes the "use the item to open the phone" path. `/phone
 key still work, and both still check that the player carries the item when
 `Config.UseItem = true`.
 
+When the inventory bridge registers usable items itself (`qs-inventory`, or a custom inventory
+whose `usableItem` returns `true`), this function is not called.
+
+</details>
+
+<details>
+
+<summary>setPhoneNumber(src, number)</summary>
+
+Only called with `Config.Phone.syncFramework = true` in `config/main.lua`. Write `number` into
+your character data, wherever your other scripts read a player's phone number, and return
+`true`. Return `false` when nothing was written: the phone tries again at the next opening.
+
+```lua
+setPhoneNumber = function(src, number)
+    return exports['my_core']:SetCharacterPhone(src, number) == true
+end,
+```
+
 </details>
 
 <details>
@@ -292,6 +325,8 @@ try to override them:
 | `Framework.jobPlayers(name)` | A scan of the native `GetPlayers()`, filtered with `hasJob` |
 | `Framework.name()` | The resolved bridge name, reported by `/phonedeps` |
 | `Framework.onPlayerLoaded(fn)` | Your `playerLoadedEvent` |
+| `Framework.onPlayerUnloaded(fn)` | Your `playerUnloadedEvent` |
+| `Framework.attendre(seconds)` | Waits up to `seconds` (60 by default) for a framework to be resolved, before the usable items are registered |
 
 The strictness of `hasJob` is deliberate: a job name misspelled in `config/services.lua` should
 be visible, not silently half-matched.
@@ -304,6 +339,7 @@ inside `server/bridge/`:
 ```lua
 NashFw.myframework = {
     playerLoadedEvent = 'my_core:playerLoaded',
+    playerUnloadedEvent = 'my_core:playerLogout',
     detect = function() return GetResourceState('my_core') == 'started' end,
     build  = function() return { --[[ ... ]] } end,
 }

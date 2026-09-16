@@ -27,7 +27,8 @@ did before this feature existed: the setup never replays, and Face ID recognises
 | Mode | Detected on | How it answers `hasItem` | How it answers `itemExists` |
 | ---- | ----------- | ------------------------ | --------------------------- |
 | `ox` | `ox_inventory` started | `exports.ox_inventory:Search(src, 'count', item) > 0` | `exports.ox_inventory:Items()` |
-| `qb` | `qb-inventory` **or** `lj-inventory` started | The framework player object's `Functions.GetItemByName(item).amount > 0` | The framework's item table |
+| `qs` | `qs-inventory` started | `exports['qs-inventory']:GetItemTotalAmount(src, item) > 0` | `exports['qs-inventory']:GetItemList()` |
+| `qb` | `qb-inventory`, `ps-inventory` **or** `lj-inventory` started | The inventory's `HasItem(src, item)` export, then the player's `Functions.GetItemByName` on older cores | The framework's item table |
 | `framework` | Always accepts: last resort | The framework bridge's `invHasItem` | The framework bridge's `invItems` |
 | `custom` | Never: you name it | `NashInvCustom.hasItem` | `NashInvCustom.itemExists` |
 
@@ -36,26 +37,32 @@ Device recognition, provider by provider:
 | Mode | Recognises a new phone? | How |
 | ---- | ----------------------- | --- |
 | `ox` | Yes, fully | The serial lives in the item's `metadata.serial`. `GetSlotWithItem` is asked for **that exact serial**, so carrying two phones at once changes nothing |
-| `qb` | Best effort | The serial lives in the item's `info.serial`, written through the core's `SetItemData`. That function is checked before being called: on a fork that does not have it, nothing is written and recognition stays off. A new serial is written on the **first** matching item; checking a known serial reads **every** copy in `PlayerData.items`, so carrying two phones does not fail Face ID |
+| `qs` | Yes | The serial lives in the item's `info.serial`, written with `SetItemMetadata` on the copy in the **lowest** slot, after copying the existing metadata. Checking a known serial reads every copy returned by `GetInventory`, so carrying two phones does not fail Face ID |
+| `qb` | Best effort | The serial lives in the item's `info.serial`, written through the inventory's `SetItemData(src, item, 'info', info, slot)` export, or the core's older `Player.Functions.SetItemData`. When neither exists, nothing is written and recognition stays off. A new serial is written on the **first** matching item; checking a known serial reads **every** copy in `PlayerData.items`, so carrying two phones does not fail Face ID |
 | `framework` | Only if you provide it | The framework bridge's `invSerial` and `invPorteSerial`, both shipped returning `nil` |
 | `custom` | Only if you provide it | `NashInvCustom.serial` and `NashInvCustom.porteSerial`, both shipped returning `nil` |
 
-Auto order is `ox`, then `qb`, then `framework`. The full detection rules are in the
+Auto order is `ox`, then `qs`, then `qb`, then `framework`. The full detection rules are in the
 [Compatibility Overview](README.md).
 
 {% hint style="info" %}
-The `qb` provider goes through the **framework player object** rather than an inventory export,
-because qb-inventory forks rename their exports often while `GetItemByName` stays stable on the
-core. The consequence: it needs a framework whose player object exposes
-`Functions.GetItemByName`. QBOX does not: on QBOX, use `ox_inventory`.
+The `qb` provider asks the **inventory's exports** first. Current qb-core no longer has
+`Player.Functions.GetItemByName` or `SetItemData`: they became exports of `qb-inventory`. The
+player functions are only a fallback for older cores. On QBOX, use `ox_inventory`.
+{% endhint %}
+
+{% hint style="info" %}
+With `qs-inventory`, the phone and earbuds items are registered as usable through
+`exports['qs-inventory']:CreateUsableItem`, not through the framework, so the item is never
+registered twice.
 {% endhint %}
 
 ## Inventories that are not auto-detected
 
-`qs-inventory` is not referenced anywhere in the resource. Neither is any other inventory
-outside the table above. With `Config.Inventory = 'auto'`, such a server silently falls through
-to the `framework` provider, which will answer from the framework's native inventory: usually
-the wrong source once a third-party inventory has taken over the items.
+Any inventory outside the table above. With `Config.Inventory = 'auto'`, such a server silently
+falls through to the `framework` provider, which will answer from the framework's native
+inventory: right when the inventory replaces the framework's item functions, usually wrong once
+a third-party inventory has taken the items over on its own.
 
 Symptom: players carry the phone item, but the phone refuses to open.
 
@@ -72,11 +79,11 @@ Config.Inventory = 'custom'
 [nash_phone] inventaire : pont personnalisé.
 ```
 
-Accepted values: `'auto'` (default), `'ox'`, `'qb'`, `'framework'`, `'custom'`. Anything else
-prints:
+Accepted values: `'auto'` (default), `'ox'`, `'qs'`, `'qb'`, `'framework'`, `'custom'`. Anything
+else prints:
 
 ```
-[nash_phone] Config.Inventory = "qs" : inconnu. Attendu : auto, ox, qb, framework, custom.
+[nash_phone] Config.Inventory = "codem" : inconnu. Attendu : auto, ox, qs, qb, framework, custom.
 ```
 
 ## The functions to implement
@@ -97,9 +104,10 @@ hasItem = function(src, item)
 end,
 ```
 
-Only a literal `true` counts. The call is wrapped in a `pcall`, so an error inside your
-function is read as "does not have it" rather than crashing the callback: which also means a
-broken implementation looks exactly like an empty pocket. Check the console.
+`true`, a number greater than zero and the string `'1'` all count; anything else means "does
+not have it". The call is wrapped in a `pcall`, so an error inside your function is read as
+"does not have it" rather than crashing the callback: which also means a broken implementation
+looks exactly like an empty pocket. Check the console.
 
 Called from four places: opening the phone, the `HasPhoneItem` export, pairing the earbuds, and
 a test command.
@@ -202,6 +210,27 @@ The question is asked in this direction on purpose. Asking "which serial does th
 phone have" forces your inventory to pick one when the player carries two, and nothing
 guarantees it picks the same one twice: the setup would replay every other time the phone
 opened.
+
+</details>
+
+<details>
+
+<summary>usableItem(name, cb) : optional</summary>
+
+For an inventory that registers usable items itself. Register `name`, call `cb(src)` when a
+player uses it, and return `true`. The framework bridge is then **not** asked to register the
+same item, so the phone never opens twice.
+
+```lua
+usableItem = function(name, cb)
+    exports['your-inventory']:CreateUsableItem(name, function(src)
+        cb(src)
+    end)
+    return true
+end,
+```
+
+Leave it out, or return `false`, and the framework bridge registers the item as before.
 
 </details>
 

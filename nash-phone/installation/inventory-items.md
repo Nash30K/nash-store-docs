@@ -96,15 +96,51 @@ Restart `es_extended` after the import. ESX only reads the `items` table at star
 freshly inserted item stays invisible until it does.
 {% endhint %}
 
+## qs-inventory
+
+Detected automatically. Declare the two items in qs-inventory's item list, with the fields its
+documentation uses (see Quasar's *Item Configuration* page), and put the images in
+`qs-inventory/html/images/`:
+
+```lua
+['phone'] = {
+    name = 'phone',
+    label = 'Phone',
+    weight = 190,
+    type = 'item',
+    image = 'phone.png',
+    unique = true,
+    useable = true,
+    shouldClose = true,
+    description = 'A smartphone.'
+},
+['phone_earbuds'] = {
+    name = 'phone_earbuds',
+    label = 'Wireless earbuds',
+    weight = 50,
+    type = 'item',
+    image = 'phone_earbuds.png',
+    unique = true,
+    useable = true,
+    shouldClose = true,
+    description = 'Wireless earbuds.'
+},
+```
+
+Keep `unique = true` on the phone: each handset then carries its own serial in its `info`, which
+is what lets a new phone ask for the first-run setup again and keeps Face ID per device. The
+phone registers both items as usable through `exports['qs-inventory']:CreateUsableItem`.
+
 ## qb-inventory and derivatives
 
 Declare the items in `qb-core/shared/items.lua`, following the shape of the entries already
 in that file. The item **names** must match `Config.ItemName` and `Config.Earbuds.itemName`;
-the rest (label, weight, image) is yours.
+the rest (label, weight, image) is yours. `ps-inventory` and `lj-inventory` are detected the
+same way.
 
-The phone reads the declared item list from the core, not from the inventory resource:
-derivatives of `qb-inventory` rename their exports often, while `GetItemByName` on the core
-is stable.
+The phone reads the declared item list from the core, and asks the inventory's exports
+(`HasItem`, `GetItemByName`, `SetItemData`) whether a player carries the item: current qb-core
+no longer has these functions on the player.
 
 ## Custom inventory
 

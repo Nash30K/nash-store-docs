@@ -294,6 +294,7 @@ shop or starter kit.
 Config.Phone = {
     prefix = '555',
     digits = 7,
+    syncFramework = false,
 }
 ```
 
@@ -301,6 +302,23 @@ Config.Phone = {
 |---|---|---|---|
 | `prefix` | `string` | `'555'` | Prefix of generated numbers |
 | `digits` | `number` | `7` | Digits after the prefix: `555-XXXXXXX` |
+| `syncFramework` | `boolean` | `false` | Copies each character's number into the framework's character data |
+
+With `syncFramework = true`, scripts that read a player's number from the framework find the
+same number as the phone. The copy happens when the character loads and when the phone opens,
+only when the number differs:
+
+| Framework | Where the number is written |
+|---|---|
+| QBCore | `PlayerData.charinfo.phone` |
+| QBOX | `charinfo.phone`, through `exports.qbx_core:SetCharInfo` |
+| ESX | The `phone_number` column of `users`, **only if it exists**: the phone never alters your tables, and says so once in the console when the column is missing |
+| Custom | Your `setPhoneNumber(src, number)`, see [Custom Framework](../compatibility/custom-framework.md) |
+
+{% hint style="warning" %}
+On QBCore and QBOX, the copy **overwrites** the number the framework generated when the
+character was created. Scripts that stored the old number elsewhere keep the old one.
+{% endhint %}
 
 Numbers are generated once per identifier, checked for uniqueness, and **never change hands**:
 there is no `UPDATE` and no `DELETE` on the numbers table anywhere in the resource, not even in

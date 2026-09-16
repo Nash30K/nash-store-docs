@@ -40,10 +40,19 @@ Player loading is picked up through the `esx:playerLoaded` event.
 | `Framework.players()` | `ESX.GetExtendedPlayers()` |
 | `Framework.usableItem(name, cb)` | `ESX.RegisterUsableItem(name, cb)` |
 | `Framework.job(src)` | `xPlayer.job`, or `xPlayer.getJob()` |
+| `Framework.setPhoneNumber(src, number)` | `UPDATE users SET phone_number`, only if that column exists |
+| Character switch | `esx:playerLogout` (server), `esx:onPlayerLogout` (client) |
 | Native inventory: item held | `xPlayer.getInventoryItem(item).count > 0` |
 | Native inventory: item list | `ESX.Items` |
 
 The last two rows are only read when `Config.Inventory` resolves to `'framework'`.
+
+## Phone number in the character data
+
+With `Config.Phone.syncFramework = true` in `config/main.lua`, the phone copies each
+character's number into `users.phone_number`, the column ESX scripts read when it exists. ESX
+has no official place for a phone number: when your `users` table has no such column, the
+console says so once and nothing is written. The phone never alters your database structure.
 
 ## Identifier
 
@@ -162,6 +171,9 @@ matching nothing.
   `xPlayer.name` and finally to `nil`, and the caller substitutes its own translated fallback.
 - **Money accounts are named `bank` and `money`.** ESX's cash account is `money`, not `cash`.
   A fork that renamed either account needs a custom bridge.
+- **Another ambulance script that revives the character.** The phone closes on death because
+  `esx_ambulancejob` leaves the character dead. A script that revives the character and plays a
+  death animation instead is not seen as dead on ESX.
 - **Changing framework later orphans everything.** See the warning in the
   [Compatibility Overview](README.md).
 

@@ -69,13 +69,14 @@ Config.Inventory = 'auto'
 | ----- | ------- |
 | `'auto'` | Automatic detection (default, recommended) |
 | `'ox'` | `ox_inventory` |
-| `'qb'` | `qb-inventory` and its derivatives |
+| `'qs'` | `qs-inventory` |
+| `'qb'` | `qb-inventory`, `ps-inventory` and `lj-inventory` |
 | `'framework'` | The framework's own inventory (ESX, QBCore) |
 | `'custom'` | Your own, written in `server/bridge/custom.lua` |
 
-Automatic detection tries **ox, then qb, then framework**. `ox_inventory` comes first because
-when it is running it is the resource that actually holds the items, whatever framework sits
-underneath.
+Automatic detection tries **ox, then qs, then qb, then framework**. `ox_inventory` comes first
+because when it is running it is the resource that actually holds the items, whatever framework
+sits underneath. `qs-inventory` comes before `qb` because on QBCore it replaces `qb-inventory`.
 
 The phone asks an inventory only two questions: does this player own the phone item, and is
 that item declared on the server. Nothing else. Both are used by `Config.UseItem` /
@@ -105,6 +106,7 @@ writes one console warning, so the phone still boots and you can wire things up 
 | `addBank(src, amount)` / `removeBank(src, amount)` | No | Transfers fail |
 | `players()` | No | Returns an empty list |
 | `usableItem(name, cb)` | No | The phone no longer opens from the item, only from the key |
+| `setPhoneNumber(src, number)` | No | `Config.Phone.syncFramework` copies nothing into the character data |
 | `invHasItem(src, item)` | No | Only used when `Config.Inventory = 'framework'` |
 | `invItems()` | No | The item-declaration check cannot run |
 
@@ -120,6 +122,11 @@ duty from your own system (see [config/services.lua](config-services.md)).
 `NashFw.custom.playerLoadedEvent` names the event your framework fires when a character is
 loaded. Leave it `nil` if you have none: the phone catches up on the first NUI start instead,
 a little later.
+
+`NashFw.custom.playerUnloadedEvent` names the server event fired when a player goes back to
+character selection without disconnecting, with the server ID as first argument. The phone
+then ends the call in progress and closes the byCloud session, as on a disconnection. Leave it
+`nil` without multiple characters.
 
 {% hint style="warning" %}
 `identifier` must be **stable over time** for a given character. It is what ties a player to
@@ -141,6 +148,7 @@ Independent from the framework: you can keep ESX and replace only the inventory.
 | -------- | ------- |
 | `hasItem(src, item)` | Boolean: does this player own the item |
 | `itemExists(name)` | `true` it exists, `false` it does not (the phone warns the admin), `nil` you cannot tell (the phone stays silent) |
+| `usableItem(name, cb)` | Optional. `true` when your inventory registered the usable item itself, so the framework does not |
 
 The third answer of `itemExists` matters. Returning `nil` is not a failure: it stops the phone
 from sending an administrator after a problem that may not exist.
