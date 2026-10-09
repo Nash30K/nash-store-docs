@@ -1,6 +1,6 @@
 # Commands
 
-NASH Phone registers the command players use every day, a look-around key binding, two camera key bindings, two client-side helpers anyone can run (`/phonepos` and `/nashprop`), and one server console command.
+NASH Phone registers the command players use every day, a cursor key binding, a camera key binding, two client-side helpers anyone can run (`/phonepos` and `/nashprop`), and one server console command.
 
 ## Player commands
 
@@ -92,26 +92,25 @@ If the model does not load, the command names the two usual causes: `nash-phonep
 
 <details>
 
-<summary>nashphone_look</summary>
+<summary>nashphone_curseur</summary>
 
-Key binding, default `Left Alt` (`Config.LookKey`). While the phone is open, it hides the cursor and gives the mouse back to the game camera, so the player can look around and keep walking. Pressing it again brings the cursor back. Any screen that needs the cursor (an incoming call, the end of a capture) brings it back on its own.
+Key binding, default `Left Ctrl` (`Config.LookKey`). While the phone is open, it hides the cursor and gives the mouse back to the game camera, so the player can look around and keep walking. Pressing it again brings the cursor back. Any screen that needs the cursor (an incoming call, the end of a capture) brings it back on its own.
 
-It does nothing while the Camera app is open: `nashcam_cursor` below handles that case. The label is written in the server language (`Config.Locale`) in the FiveM key bindings screen.
+While the Camera app is active (also during a video call or a live), the same key shows or hides the cursor over the camera screen. The on-screen hints display the key the player actually bound. Crouching is blocked while the phone is open. The label is written in the server language (`Config.Locale`) in the FiveM key bindings screen.
 
 </details>
 
 <details>
 
-<summary>nashcam_photo / nashcam_cursor</summary>
+<summary>nashcam_photo</summary>
 
-Camera app key bindings. They are registered as commands so FiveM can expose them in *Settings → Key Bindings*, but they only do something while the camera is active.
+Camera app key binding. It is registered as a command so FiveM can expose it in *Settings → Key Bindings*, but it only does something while the camera is active.
 
 | Command | Default key | Effect |
 |---|---|---|
 | `nashcam_photo` | `Enter` | Takes the picture. Ignored during a call and while a capture is already running |
-| `nashcam_cursor` | `Left Alt` | Toggles the mouse cursor over the camera UI |
 
-Both labels go through the locale system and are written in the server language (`Config.Locale`) in the FiveM key bindings screen.
+The label goes through the locale system and are written in the server language (`Config.Locale`) in the FiveM key bindings screen.
 
 </details>
 

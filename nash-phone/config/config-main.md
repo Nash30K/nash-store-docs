@@ -226,7 +226,7 @@ them would lock their real owner out with no recourse.
 |---|---|---|---|
 | `Config.OpenKey` | `string` | `'F1'` | Default key binding |
 | `Config.OpenCommand` | `string` | `'phone'` | Chat command: `/phone` |
-| `Config.LookKey` | `string` | `'LMENU'` | Default key that frees the mouse to look around while the phone is open |
+| `Config.LookKey` | `string` | `'LCONTROL'` | Default key that hides or shows the cursor while the phone is open |
 
 `Config.OpenKey` is registered through `RegisterKeyMapping`, so it is a **default**: each player
 can remap it in FiveM's own key settings, and a binding a player has already stored wins over a
@@ -237,11 +237,13 @@ The same command or key closes the phone when it is open, except during a call o
 Keep `Config.OpenCommand` filled in: it has no fallback value. Escape and Backspace also close
 it; the right mouse button does not.
 
-`Config.LookKey` (Left Alt by default) works like the open key: it is a default each player can
+`Config.LookKey` (Left Ctrl by default) works like the open key: it is a default each player can
 remap. While the phone is open, it hides the cursor and gives the mouse back to the game camera,
 so the player can look around while walking with the phone in hand; pressing it again brings the
-cursor back. It does nothing while the Camera app is open, which has its own Left Alt binding.
-An empty string registers no key.
+cursor back. In the Camera app, in a video call and in a live, the same key shows or hides the
+cursor over the camera screen, and the on-screen hints display the key the player actually bound.
+Crouching is blocked while the phone is open, so Ctrl does not make the character crouch. An
+empty string registers no key.
 
 ## Phone item
 

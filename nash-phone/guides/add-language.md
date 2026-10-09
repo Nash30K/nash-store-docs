@@ -32,7 +32,7 @@ Every file carries two blocks, and that is all there is to know:
 | Block | What it holds | Count |
 | ----- | ------------- | ----- |
 | `dict` | Everything displayed **on the phone screen** | ~2,750 strings |
-| `lua` | Messages displayed **outside the phone**: notifications, warnings, key-mapping labels | 83 strings |
+| `lua` | Messages displayed **outside the phone**: notifications, warnings, key-mapping labels | 82 strings |
 
 The file also starts with a `_lisezMoi` block: a short note in English for whoever opens it.
 It is not read by the phone, you can leave it or delete it.
@@ -160,7 +160,7 @@ language it had before.
 At startup, the server prints one green line per loaded language:
 
 ```
-[nash_phone] Langue « zh » chargee : 2758 texte(s) d ecran, 83 message(s).
+[nash_phone] Langue « zh » chargee : 2772 texte(s) d ecran, 82 message(s).
 ```
 
 The two counts are the real number of keys read from your file. A count far below the shipped
