@@ -19,7 +19,8 @@ local QB = exports['qb-core']:GetCoreObject()
 Calling `GetCoreObject()` at load time on a server without `qb-core` would throw before the
 config had even been read, which is why no provider file calls anything while loading.
 
-Player loading is picked up through the `QBCore:Server:OnPlayerLoaded` event.
+Player loading is picked up through the `QBCore:Server:PlayerLoaded` event, which passes the
+player object (the phone reads `PlayerData.source` from it).
 
 {% hint style="warning" %}
 If you run `qbx_core` **and** a `qb-core` compatibility resource side by side, auto-detection
@@ -66,16 +67,12 @@ handled:
 
 - a **string:** returned as-is;
 - a **table** such as `{ god = true, admin = true }`: scanned for `superadmin`, `admin`,
-  `god`, `mod`, in that order, and the first match is returned as the group name. `admin`
-  comes before `god` because a god inherits `admin` through the principals of QBCore's
-  `server.cfg`, and `Config.DebugGroups` expects `admin`.
+  `god`, `mod`, in that order, and the first match is returned as the group name.
 
-The bridge returns `nil`, never `'user'`, when it cannot tell: refusing an admin who has just
-connected is worse than returning nothing.
+The bridge returns `nil`, never `'user'`, when it cannot tell.
 
-Groups gate the `/phone*` test commands through `Config.DebugGroups`, default
-`{ 'admin', 'superadmin' }`. On a QBCore server whose permission names differ, either add them
-to that list or use the `nash_phone.debug` ACE instead.
+No feature of the phone reads the group at the moment: `group` is part of the bridge interface
+only.
 
 ## Money
 
@@ -170,16 +167,14 @@ as required, not optional, before opening a QBCore server.
 
 ## Pitfalls
 
-- **The item gate has no back door.** `/phone` and the open key both go through the same
-  server check. If the item is not declared, nobody opens the phone: not even an admin.
-  Fifteen seconds after start the console prints a red block saying exactly that.
+- **The item gate has no back door.** `/phone`, the open key and the `ToggleOpen` / `OpenApp`
+  client exports all go through the same server check. If the item is not declared, nobody
+  opens the phone: not even an admin. Fifteen seconds after the framework is detected the
+  console prints a red block saying exactly that.
 - **`charinfo` must be a table.** `Framework.fullName` reads `charinfo.firstname` and
   `charinfo.lastname` directly and returns `nil` when `charinfo` is not a table. Forks that
   store it as a JSON string will show the translated "Unknown" fallback everywhere; that needs
   a custom bridge.
-- **Non-standard permission names.** `GetPermission` returning something other than a string
-  or a `superadmin` / `admin` / `god` / `mod` table yields `nil`, and the `/phone*` test
-  commands then only accept the `nash_phone.debug` ACE.
 - **Changing framework later orphans everything.** Phone tables are keyed on the citizenid.
   See the warning in the [Compatibility Overview](README.md).
 
@@ -187,8 +182,8 @@ as required, not optional, before opening a QBCore server.
 
 1. `[nash_phone] framework détecté : qbcore.` appears in the console at start: **not**
    `qbox`, unless you meant it.
-2. `/phonedeps` reports `qb-core` as the framework in use, and the expected inventory.
-3. `/phonedeps` reports the phone item as declared.
+2. The `inventaire détecté : ...` line names the expected inventory.
+3. No red `DOES NOT EXIST` block about the phone item appears in the 15 seconds that follow.
 4. The phone opens with the item in the player's pocket, and refuses without it.
 5. Settings shows the character's real RP name, not the translated "Unknown".
 6. The Bank app shows the same balance as `PlayerData.money.bank`, and a transfer between two
@@ -196,4 +191,3 @@ as required, not optional, before opening a QBCore server.
    disconnects mid-transfer.
 7. A player with the `police` job sees their service page in the Services app, and the Duty
    switch is present (`ownDuty = true`) or absent (`ownDuty = false`) as configured.
-8. `/phonehelp` is accepted for an admin and refused for a plain player.

@@ -67,9 +67,8 @@ matches.
 earlier version of the bridge used it and recognised no administrator at all.
 {% endhint %}
 
-Groups gate the `/phone*` test commands through `Config.DebugGroups`, default
-`{ 'admin', 'superadmin' }`. On a QBOX server using different permission names, add them to
-that list or use the `nash_phone.debug` ACE.
+No feature of the phone reads the group at the moment: `group` is part of the bridge interface
+only.
 
 ## Jobs
 
@@ -151,12 +150,11 @@ checklist below before opening a QBOX server.
 ## Checklist
 
 1. `[nash_phone] framework détecté : qbox.` appears in the console at start: not `qbcore`.
-2. `/phonedeps` reports `qbx_core` as the framework and `ox_inventory` as the inventory.
-3. `/phonedeps` reports the phone item as declared.
+2. `[nash_phone] inventaire détecté : ox.` appears too.
+3. No red `DOES NOT EXIST` block about the phone item appears in the 15 seconds that follow.
 4. Using the item from `ox_inventory` opens the phone; so do `/phone` and the open key; and
    both refuse a player who does not carry the item.
 5. Settings shows the character's real RP name, not the translated "Unknown".
 6. The Bank app shows the same balance as `PlayerData.money.bank`, and a transfer between two
    connected players moves money on both sides.
 7. A player with the `police` job sees their service page in the Services app.
-8. `/phonehelp` is accepted for an admin and refused for a plain player.

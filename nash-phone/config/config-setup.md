@@ -17,10 +17,9 @@ first startup that follows, and only then: the catch-up pass only runs when the 
 empty while phones already exist. Running it on every boot would mark "already configured" a
 player who bought their phone yesterday and has not finished.
 
-To see the flow again while testing: `/phonesetupreset`, or delete the character's row in
-`nash_phone_setup`. The command only exists with
-[`Config.Debug`](config-main.md#test-commands) turned on. Other resources can offer a "brand new
-phone" through the `ResetPhoneSetup` export.
+To see the flow again while testing, delete the character's row in `nash_phone_setup` (the
+`owner` column holds the framework identifier). Other resources can offer a "brand new phone"
+through the `ResetPhoneSetup` export, which deletes that same row.
 
 When the flow completes, the server fires `nash-phone:setupCompleted` with the character's
 choices, for resources that want to hand out a starter item, write a log, or greet the player.
@@ -58,8 +57,8 @@ greetings = {
     { text = 'hello',   hint = 'Swipe up to open' },
     { text = 'bonjour', hint = 'Balayez vers le haut pour ouvrir' },
     { text = 'hola',    hint = 'Desliza hacia arriba para abrir' },
-    { text = 'ciao',    hint = 'Scorri verso l alto per aprire' },
-    { text = 'hallo',   hint = 'Nach oben wischen zum Offnen' },
+    { text = 'ciao',    hint = "Scorri verso l'alto per aprire" },
+    { text = 'hallo',   hint = 'Nach oben wischen zum Öffnen' },
     { text = 'olá',     hint = 'Deslize para cima para abrir' },
     { text = 'привет',  hint = 'Проведите вверх, чтобы открыть' },
 },
@@ -68,7 +67,7 @@ greetingHoldMs = 2000,
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `greetings` | `table` | 7 entries | `text` is the greeting (max 32 characters), `hint` the bottom line in the same language (max 64). `hint` fades in rather than being written |
+| `greetings` | `table` | 7 entries | `text` is the greeting (32 bytes at most: a longer one is dropped), `hint` the bottom line in the same language (64 bytes at most: a longer one is left blank). `hint` fades in rather than being written |
 | `greetingHoldMs` | `number` | `2000` | How long the word stays readable once written, in milliseconds. Values below `600` are raised to `600` |
 
 An empty or unusable list falls back to a single `hello` entry, so the screen is never blank.
@@ -90,21 +89,21 @@ the font.
 
 ```lua
 languages = {
-    { code = 'fr', label = 'Francais' },
+    { code = 'fr', label = 'Français' },
     { code = 'en', label = 'English' },
     { code = 'de', label = 'Deutsch' },
     { code = 'nl', label = 'Nederlands' },
     { code = 'it', label = 'Italiano' },
-    { code = 'es', label = 'Espanol' },
-    { code = 'pt', label = 'Portugues' },
-    { code = 'ru', label = 'Russkiy' },
+    { code = 'es', label = 'Español' },
+    { code = 'pt', label = 'Português' },
+    { code = 'ru', label = 'Русский' },
 },
 ```
 
 | Field | Type | Limit | Description |
 |---|---|---|---|
-| `code` | `string` | 8 characters | The language file's code |
-| `label` | `string` | 48 characters | Shown as written, in its own language: the only way a player recognises theirs in a list |
+| `code` | `string` | 8 bytes | The language file's code |
+| `label` | `string` | 48 bytes | Shown as written, in its own language: the only way a player recognises theirs in a list |
 
 {% hint style="warning" %}
 This list is **display only**. Picking a language actually switches the phone **only if that
@@ -113,8 +112,9 @@ original language, on purpose: a readable phone beats a half-translated one. The
 there to make the screen believable.
 {% endhint %}
 
-Entries missing a `code` or a `label` are dropped. If nothing survives, the list falls back to a
-single `{ code = 'fr', label = 'Francais' }` entry: a language screen with no rows would be a
+Entries missing a `code` or a `label`, or going over those limits, are dropped (an accented
+letter or a Cyrillic one takes two bytes). If nothing survives, the list falls back to a single
+`{ code = 'fr', label = 'Français' }` entry: a language screen with no rows would be a
 setup you cannot get out of. The value the phone sends back is checked against this list before
 being stored.
 
@@ -133,7 +133,7 @@ countries = {
 
 Fill this with **your** universe. It ships with the map's towns rather than two hundred
 countries: a server set in Los Santos has no reason to offer Turkmenistan. The list order is used
-as written: put it in the order you want on screen. Each entry is capped at 48 characters, and
+as written: put it in the order you want on screen. An entry longer than 48 bytes is dropped, and
 an empty list falls back to your city name from
 [config/settings.lua](config-settings.md).
 
@@ -217,10 +217,10 @@ faceId = {
 | Key | Type | Default | Accepted range | Description |
 |---|---|---|---|---|
 | `enabled` | `boolean` | `true` | - | `false` removes the Face ID step |
-| `scans` | `number` | `2` | 1 – 3 | Number of sweeps around the circle |
+| `scans` | `number` | `2` | 1 to 3 | Number of sweeps around the circle |
 
 Two is the value real phones use, and the one that makes the step believable without dragging it
-out. Values outside 1–3 are clamped.
+out. Values outside 1 to 3 are clamped.
 
 ## Passcode
 
@@ -240,7 +240,7 @@ passcode = {
 | `length` | `number` | `6` | `4` or `6` | Passcode length |
 
 {% hint style="warning" %}
-`length` accepts **only `4` or `6`**. Any other value: including `8`: silently falls back to
+`length` accepts **only `4` or `6`**. Any other value, `8` included, silently falls back to
 `6`. The setup screen and the server check the exact length together, so a modified client cannot
 save a two-digit code.
 {% endhint %}
@@ -288,9 +288,10 @@ loses their phone does not lose their texts. The byCloud account is not touched 
 never belonged to the device.
 {% endhint %}
 
-`/phonesetup` prints the recorded serial next to the one currently in hand. That single line
-separates "this is a different handset" from "the setup was never saved", which otherwise look
-identical from the player's side.
+From the player's side, "this is a different handset" and "the setup was never saved" look
+identical. To tell them apart, read the character's row in `nash_phone_setup`: `device` holds
+the serial of the handset last recognised, and `done` is `1` once the setup was saved. Compare
+`device` with the `serial` stored in the data of the phone item the player carries.
 
 Other resources can react with the `nash-phone:deviceChanged` server event: see
 [Server Events](../developer-api/server-events.md).
@@ -298,6 +299,7 @@ Other resources can react with the `nash-phone:deviceChanged` server event: see
 ## Fallbacks
 
 If `config/setup.lua` is missing, or `Config.Setup` is not a table, the server applies
-`enabled = true`, `skippable = false`, `greetingHoldMs = 2000` and prints one line in the console
-explaining what it expected. Each sub-block (`cloudAccount`, `faceId`, `passcode`, `languages`,
-`countries`, `greetings`) falls back independently.
+`enabled = true`, `skippable = false`, `greetingHoldMs = 2000`. When `Config.Setup` exists but is
+not a table, it also prints one line in the console explaining what it expected. Each sub-block
+(`cloudAccount`, `faceId`, `passcode`, `languages`, `countries`, `greetings`) falls back
+independently.

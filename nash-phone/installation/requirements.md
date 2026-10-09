@@ -7,9 +7,11 @@
 - **OneSync**: required. It is a hard dependency (`/onesync` in `fxmanifest.lua`), so the
   resource does not start without it.
 - **MySQL**: 5.7 or 8.0. Tables are created as `InnoDB` / `utf8mb4`.
-- The MySQL account used by `oxmysql` needs `ALTER TABLE` and read access to
-  `information_schema`. Both are used at every boot by the migration pass. See
+- The MySQL account used by `oxmysql` needs `CREATE TABLE`, `ALTER TABLE` and read access to
+  `information_schema`. All three are used at every boot by the migration pass. See
   [Database](database.md).
+- **Asset Escrow**: the resource is escrow-protected, so it only runs on a server whose license
+  key belongs to the Cfx.re account that owns the asset.
 
 ## Required resources
 
@@ -18,7 +20,7 @@
 | `ox_lib` | Client/server callbacks, notification fallback |
 | `oxmysql` | Database access |
 | A **framework** | `es_extended` (ESX), `qb-core` (QBCore), `qbx_core` (QBOX), or your own through `server/bridge/custom.lua`. It provides the player identifier, the RP name, money and job |
-| An **inventory** | Only if `Config.UseItem = true` (the default). `ox_inventory`, `qb-inventory` and derivatives, the framework's own inventory, or a custom bridge |
+| An **inventory** | Only if `Config.UseItem = true` (the default). `ox_inventory`, `qs-inventory`, `qb-inventory` and derivatives (`ps-inventory`, `lj-inventory`), the framework's own inventory, or a custom bridge |
 
 {% hint style="info" %}
 No framework is declared as a hard dependency, and that is deliberate: a missing hard
@@ -28,19 +30,20 @@ boot and announces it in the console instead.
 
 ## Optional resources
 
-None of these block startup. The phone boots without them and tells you in the console what
-it lost.
+None of these block startup, and the phone does not report them in the server console: ensure
+each one you want before `nash_phone` in `server.cfg`. The table below says what stops working
+without each one.
 
 | Resource | What you lose without it |
 | -------- | ------------------------ |
-| `pma-voice` | Voice during calls. The call still rings, connects and is logged, but nobody hears anybody. The provider name is read from `Config.Voice.provider`, so a different voice resource can be named there |
-| `screenshot-basic` | In-game captures: Camera photos, Snapz and ChatApp snaps. The gallery stops filling up |
+| `pma-voice` | Voice during calls. The call still rings, connects and is logged, but nobody hears anybody. It is the only voice resource the phone drives: leave `Config.Voice.provider` on `'pma-voice'`, since with any other value calls stay silent |
+| `screenshot-basic` | The automatic profile picture (the character's head shot) of Snapz and ChatApp, and the Camera's fallback capture when the phone cannot read the game view. Camera photos and videos are normally captured by the phone itself and do not go through it |
 | `nash-phoneprop` | The 3D model held in hand. The phone falls back to `Config.Prop.fallback` (`prop_npc_phone_02`) and stays usable. See [Streamed prop](streamed-prop.md) |
 | `xsound` | Link playback in the Music app (proximity audio). The rest of the phone is untouched |
 
-`/phonedeps` prints this exact list in game with the live state of every resource, plus a
-real query against the database: a started `oxmysql` pointed at a wrong connection string
-still reports as `started`.
+For the database, a started `oxmysql` is not proof enough: pointed at a wrong connection string
+it still starts. The `schéma DB prêt` line in the server console is what shows the database
+answers. See [First Launch](first-launch.md#server-console-at-startup).
 
 ## Outside the server
 
@@ -56,16 +59,16 @@ is the most common setup there is, and that combination needs no configuration a
 | Key | Default | Accepted values |
 |---|---|---|
 | `Config.Framework` | `'auto'` | `auto`, `esx`, `qbcore`, `qbox`, `custom` |
-| `Config.Inventory` | `'auto'` | `auto`, `ox`, `qb`, `framework`, `custom` |
+| `Config.Inventory` | `'auto'` | `auto`, `ox`, `qs`, `qb`, `framework`, `custom` |
 
 Detection order in `auto` mode:
 
 - **Framework**: Qbox, then QBCore, then ESX. Qbox is tried first on purpose: many Qbox
   servers run a compatibility `qb-core` alongside, and looking for QBCore first would file
   them in the wrong bridge.
-- **Inventory**: `ox_inventory`, then `qb-inventory` (and `lj-inventory`), then the
-  framework's own inventory. When `ox_inventory` runs, it owns the items regardless of the
-  framework underneath.
+- **Inventory**: `ox_inventory`, then `qs-inventory`, then `qb-inventory` (or `ps-inventory`,
+  `lj-inventory`), then the framework's own inventory. When `ox_inventory` runs, it owns the
+  items regardless of the framework underneath.
 
 Both decisions are printed at boot:
 
@@ -86,11 +89,14 @@ unreachable. Decide before opening, or write a migration.
 
 ## Compatibility notes
 
-- The phone asks an inventory only two questions: does this player carry the phone item, and
-  is that item declared on the server. Nothing else.
-- On **Qbox**, usable items are registered through `ox_inventory`, not through the core. On a
-  Qbox server without `ox_inventory`, using the item does nothing. The key and the `/phone`
-  command still open the phone for anyone who owns the item.
+- The phone asks an inventory two questions: does this player carry the phone item, and is
+  that item declared on the server. Two optional questions (the serial of the handset) let it
+  recognise a new phone; see [Custom Inventory](../compatibility/custom-inventory.md).
+- On **Qbox**, the phone registers the usable item with `exports.qbx_core:CreateUseableItem`,
+  and it is `ox_inventory` that calls it when a player uses the item. Qbox has no inventory of
+  its own: without `ox_inventory` (or `qs-inventory`, which registers the item itself), nothing
+  can use the item. The key and the `/phone` command
+  still open the phone for anyone who owns the item.
 - A custom framework is wired by filling `server/bridge/custom.lua` and setting
   `Config.Framework = 'custom'`. A bridge that does not implement a function returns a
   neutral value and says so once in the console rather than erroring.

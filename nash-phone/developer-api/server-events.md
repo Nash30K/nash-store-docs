@@ -12,7 +12,7 @@ All timestamps (`createdAt`) are Unix epoch **milliseconds** with one-second pre
 
 ## Social networks
 
-The three events below exist for third-party resources: logging, moderation, Discord relays. Nothing inside the phone consumes them.
+The events below exist for third-party resources: logging, moderation, Discord relays. Nothing inside the phone consumes them.
 
 <details>
 
@@ -43,8 +43,6 @@ local row = MySQL.single.await(
     { data.postId })
 ```
 
-The test command `/phonefakepost` fires the same event with a seeded author, so a moderation log will show entries that no real player wrote. See [Commands](commands.md).
-
 </details>
 
 <details>
@@ -65,7 +63,7 @@ end)
 |---|---|---|
 | `appId` | `string` | `snapz`, `instapic` or `chatapp` |
 | `storyId` | `number` | Row id in `nash_phone_social_stories` |
-| `author` | `string` | In-app username |
+| `author` | `string` | In-app reference: the username on `snapz` and `instapic`, the phone number on `chatapp` |
 | `createdAt` | `number` | Epoch ms |
 
 **Limits:** the story kind (`image`, `video`, `text`), its media URL and its text are not in the payload; read them from `nash_phone_social_stories`. Stories expire from the feed after 24 hours but the rows stay, so a handler that queries later still finds them.
@@ -81,7 +79,7 @@ A private message was sent inside a social app (the DM, not the SMS app).
 ```lua
 AddEventHandler('nash-phone:social:messageSent', function(data)
     -- data.appId, data.messageId, data.sender, data.recipient
-    -- data.type, data.share, data.text, data.imageUrl, data.createdAt
+    -- data.type, data.share, data.text, data.imageUrl, data.ephemeral, data.createdAt
 end)
 ```
 
@@ -89,7 +87,7 @@ end)
 
 | Field | Type | Description |
 |---|---|---|
-| `appId` | `string` | `chatapp`, `snapz`, `instapic`, `birdby` or `ticktok` |
+| `appId` | `string` | `chatapp`, `snapz`, `instapic`, `birdby`, `ticktok` or `cindr` |
 | `messageId` | `number` | Row id in `nash_phone_social_messages` |
 | `sender` | `string` | In-app reference of the sender |
 | `recipient` | `string` | In-app reference of the recipient |
@@ -97,9 +95,10 @@ end)
 | `share` | `table?` | Snapshot of the shared publication when `type == 'post'`, otherwise `nil` |
 | `text` | `string?` | Message body: `nil` when the message is a shared publication |
 | `imageUrl` | `string?` | Attached image, `nil` if none |
+| `ephemeral` | `boolean?` | `true` for a Snapz snap (a photo that disappears once opened), otherwise `nil` |
 | `createdAt` | `number` | Epoch ms |
 
-**Note:** `text` keeps its original meaning (plain text only); `type` and `share` were added on top and are always absent for a text message. On `chatapp`, the in-app reference is the phone number; on the other four it is the account username.
+**Note:** `text` keeps its original meaning (plain text only); `type` and `share` were added on top and are always absent for a text message. On `chatapp`, the in-app reference is the phone number; on the other apps it is the account username. For a snap, `imageUrl` still carries the picture address, even though the phone erases it once the recipient opens it.
 
 The event fires whether or not the recipient is online. An offline recipient reads the message on their next connection: the row is written either way.
 
@@ -191,10 +190,10 @@ end)
 | `direction` | `string` | `in` (credit) or `out` (debit) |
 | `number` | `string` | Phone number of the account the line belongs to |
 | `amount` | `number` | Absolute amount, always positive |
-| `label` | `string` | Label supplied by the caller, **untruncated** |
+| `label` | `string` | For `AddTransaction`, the title passed by the caller, **untruncated**. For `SentMoney`, the localized word for "Transfer". For an in-app transfer, the note the sender typed, possibly an empty string |
 | `image` | `string?` | Optional thumbnail, `nil` for an in-app transfer |
 
-**Note:** a player-to-player transfer fires the event **twice:** once with `out` for the sender, once with `in` for the recipient. Deduplicate on `(number, direction)` if you keep an external ledger.
+**Note:** a player-to-player transfer fires the event **twice:** once with `out` for the sender, once with `in` for the recipient (`SentMoney` does the same). Deduplicate on `(number, direction)` if you keep an external ledger. An in-app transfer really moves the money through the framework before the event fires; the two exports only write history.
 
 `label` is the value the caller passed, in full. The columns it is stored in are shorter (`counterpart` is `VARCHAR(16)`, `memo` is `VARCHAR(128)`), so what you receive here can be longer than what a later `SELECT` returns.
 
@@ -223,7 +222,7 @@ end)
 
 **Note:** despite the name this fires on every bootstrap, not only when the number actually changes. It is the reliable signal for "this player's phone number is now readable". The same value is on the state bag `Player(source).state.phoneNumber`.
 
-A bootstrap runs once when the character is loaded, before the phone is ever opened, then again at each opening. Expect this event several times per session, and keep your handler safe to run more than once.
+A bootstrap runs shortly after the character is loaded, before the phone is ever opened, then again at each opening and on every call to the client `ReloadPhone` export. Expect this event several times per session, and keep your handler safe to run more than once.
 
 </details>
 
@@ -243,7 +242,7 @@ end)
 
 **Order:** `numberChanged` fires first, then `phoneNumberGenerated`. A handler on both will see both for a brand new character.
 
-**When:** as soon as the character is loaded by your framework, not when the player first opens the phone. It fires exactly once per character, even across server restarts.
+**When:** shortly after the character is loaded by your framework, not when the player first opens the phone. It fires exactly once per character, even across server restarts.
 
 **Created while offline:** a number can be created for a character who is not connected, for example when another resource calls an export with that character's identifier. The event then fires at that character's next connection, with a valid `source`, so a starter item or a welcome message still reaches them.
 
@@ -280,9 +279,11 @@ end)
 | `cloudEmail` | `string?` | Cloud account address entered during setup |
 | `faceId` | `boolean` | Face ID enabled |
 
-**Note:** the passcode is deliberately **not** in the payload. Setup writes everything at once at the end, so this event fires exactly once per character; a player who abandons midway leaves no half-configured phone and fires nothing.
+**Note:** the passcode is deliberately **not** in the payload. Setup applies the chosen settings at once at the end, so the event fires once each time a character completes the setup; a player who abandons midway leaves no half-configured phone and fires nothing.
 
-Setup can be replayed for a character with `Setup.reinitialiser(owner)` server-side, or with the `/phonesetupreset` test command.
+In practice that means once per character, plus once more after each reset: a new handset (see `nash-phone:deviceChanged` below) or the `ResetPhoneSetup` server export.
+
+It never fires while `Config.Setup.enabled` is `false` (`config/setup.lua`). The characters that already existed when the setup was first installed are marked as configured without going through it, so they do not fire it either.
 
 </details>
 
@@ -346,13 +347,40 @@ Always type-check `target`. It is a `number` in the normal case, but stays a `st
 
 </details>
 
+## Dating
+
+<details>
+
+<summary>nash-phone:dating:matched</summary>
+
+Two Cindr profiles liked each other: a new match was created.
+
+```lua
+AddEventHandler('nash-phone:dating:matched', function(data)
+    -- data.appId, data.a, data.b, data.createdAt
+end)
+```
+
+**Payload:** one table
+
+| Field | Type | Description |
+|---|---|---|
+| `appId` | `string` | Always `cindr` |
+| `a` | `string` | Cindr username of one side |
+| `b` | `string` | Cindr username of the other side |
+| `createdAt` | `number` | Epoch ms |
+
+**Note:** `a` and `b` are sorted alphabetically, not in the order of the likes: the payload does not tell who liked first. The event fires only when the match is new: a like on a pair that is already matched fires nothing.
+
+</details>
+
 ## Custom applications
 
 <details>
 
 <summary>nash_phone:customAppUsed</summary>
 
-A player opened a custom app. Note the **underscore** prefix on this one.
+A player opened a custom app that has an `onServerUse`. Note the **underscore** prefix on this one.
 
 ```lua
 AddEventHandler('nash_phone:customAppUsed', function(src, identifier)
@@ -368,9 +396,11 @@ end)
 | `src` | `number` | Player server ID |
 | `identifier` | `string` | App identifier as declared in `AddCustomApp` / `Config.CustomApps` |
 
-**Why it matters:** an app declared at runtime from a client script cannot ship an `onServerUse` callback (a Lua function does not cross the network). This event is the supported server-side entry point for those apps. Only an app declared in `config/custom_apps.lua` gets its `onServerUse` called directly.
+**When it fires:** the player's client only tells the server that an app was opened when the app's declaration carries an `onServerUse` function. The server then calls that `onServerUse` if the app is declared in `config/custom_apps.lua`, and fires this event right after. An app declared without `onServerUse`, which is the usual case for an app declared from your own resource with `AddCustomApp`, never fires it.
 
-The event fires for **every** custom app, including ones from other resources, so always filter on `identifier`. See [Custom Applications](custom-apps.md).
+For an app declared from your own resource, the reliable server-side entry point is your own interface: have the page call `fetchNui` once it is mounted, and trigger your own server event from that NUI callback. See [Custom Applications](custom-apps.md).
+
+Filter on `identifier`, and treat it as a claim from the player's client, not a proof: the server fires this event for whatever identifier the client sends, so never hand out a reward on this event alone.
 
 </details>
 
@@ -390,9 +420,9 @@ TriggerServerEvent('nash_phone:requestOpen')
 
 **Behavior**
 
-- When `Config.UseItem = true`, the server checks that the player owns `Config.ItemName` through the inventory bridge. Without it, the player gets a `nash_phone:toast` and the phone stays closed.
-- On success the server fires `nash_phone:open` back at that client.
+- When `Config.UseItem = true`, the server checks that the player owns `Config.ItemName` through the inventory bridge. Without it, the server sends a `nash_phone:toast` and the phone stays closed. That toast is sent as an error that is displayed whatever `Config.NotifyStyle` is, so the player always sees "You don't have a phone.".
+- On success the server fires `nash_phone:open` back at that client, which still refuses to open a confiscated phone (`ToggleDisabled`) or the phone of a dead or cuffed player.
 
-This is the path used by both the `/phone` command and the key binding, which is why the item check cannot be bypassed client-side. From a **client** script, prefer the `ToggleOpen` export: it also honours the "phone confiscated" state. From a **server** script, use `TriggerClientEvent('nash_phone:open', src)` to open a phone unconditionally.
+This is the path used by both the `/phone` command and the key binding, which is why the item check cannot be bypassed client-side. From a **client** script, the `ToggleOpen` and `OpenApp` exports run the same item check, through the server callback `nash_phone:canOpen`, before they open (see [Client Exports](client-exports.md)). From a **server** script, use `TriggerClientEvent('nash_phone:open', src)` to open a phone without the item check.
 
 </details>

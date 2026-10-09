@@ -15,7 +15,7 @@ Config.Upload = {
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `provider` | `string` | `'fivemanage'` | The only supported host. Any other value disables uploads |
-| `apiKey` | `string` | - | Your Fivemanage media API token |
+| `apiKey` | `string` | `''` | Your Fivemanage media API token. Empty: the Camera stays disabled |
 
 {% hint style="danger" %}
 **This file is server-side only.** It is declared in `server_scripts` in `fxmanifest.lua` and it
@@ -29,11 +29,9 @@ single-use upload address.
 {% endhint %}
 
 {% hint style="warning" %}
-**The key that comes with the script is not yours.** If your copy of `config/upload.lua` arrives
-with an `apiKey` already filled in, it is a trial key shared by every copy of the product:
-replace it with your own before going live, or your server's photos are hosted on somebody
-else's account and count against somebody else's bandwidth bill. If it arrives empty, the Camera
-stays disabled until you fill it in.
+**Use your own key.** The file ships with an empty `apiKey`, and the Camera stays disabled until
+you fill it in. Never paste a key somebody else gave you: your server's photos would be hosted
+on their account and count against their bandwidth, and they could delete them at any time.
 {% endhint %}
 
 ## Getting a key
@@ -107,21 +105,15 @@ long as the file exists. Such a link is public, readable by anyone who has it.
 
 ## How the upload works
 
-All of it is handled by `server/services/upload.lua`. There are two paths, and one of them is
-no longer used by anything:
+Every upload goes through a **presigned address**: the server asks Fivemanage for a temporary
+upload address and hands **only that address** to the player's game, which sends the file
+directly. The key stays on the server. This covers photos and videos from the Camera, the
+pictures of the social apps, and pictures added by link in Photos.
 
-| Path | Used for | Note |
-|---|---|---|
-| **Presigned** | Everything: videos filmed by the interface, stills posted by `screenshot-basic`, and pictures added by link in Photos | The server asks Fivemanage for a temporary address and returns **only that address**. The key stays on the server |
-| **Relay** | No caller left | The file comes up in base64 and the server posts it. Kept for a host that cannot presign, and capped at 200 KB accordingly |
-
-The relay was the photo path until it turned out that a reliable network event cannot carry an
-image: past 393,216 bytes FiveM **kicks the player**.
-
-Both paths share one rate limit, because they are two halves of the same upload: **12 uploads
-per minute per player**. Removing the key from the client stops it being read, not being used:
-a modified client could otherwise ask for presigned addresses in a loop and drain the owner's
-quota without even having a file to send.
+The server rate-limits these addresses: **24 per minute per player**. Keeping the key off the
+client stops it being read, not being used: without that limit a modified client could ask for
+presigned addresses in a loop and drain your quota without even having a file to send. On top of
+that, a player can save at most 20 photos, videos and imports per minute.
 
 A picture added by link counts like a camera photo: up to **two** presigned addresses, one for
 the picture and one for its thumbnail, taken from the same counter and from the same Fivemanage

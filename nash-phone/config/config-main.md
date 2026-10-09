@@ -14,12 +14,15 @@ File: `config/main.lua`
 
 `Config.Locale` accepts any code that has a matching file in `locales/`. The phone ships with
 `locales/fr.json` and `locales/en.json`. To add one, copy `locales/en.json` to
-`locales/<code>.json`, translate it, and write that code here: nothing to compile.
+`locales/<code>.json`, translate it, and write that code here: nothing to compile. The full
+procedure is in [Add a language](../guides/add-language.md).
 
 The value is normalised before use: case and surrounding spaces are tolerated (`'EN'`, `' en '`
-both work). A code with **no matching file falls back to French**, not to English, and it does
-so silently: if the phone stays in French after you changed this line, the file name is the
-first thing to check.
+both work). A code with **no matching file falls back to French**, not to English. The only
+trace is one red line in the server console at startup (`[nash_phone] locales/<code>.json est
+introuvable`): if the phone stays in French after you changed this line, the file name is the
+first thing to check. The same applies to each code of `Config.ExtraLocales`: a code without its
+file is skipped.
 
 A player who picks a language in Settings overrides this choice, and it is kept across
 sessions.
@@ -48,15 +51,32 @@ arrives while the phone is **put away**.
 `'oxlib'` does not remove the phone banner for everything. Notifications written by the server
 (text message, mail, transfer, missed call) always reach the web page, which is never unloaded
 and raises the frame on its own. What `Config.NotifyStyle` adds or removes on that path is the
-`ox_lib` toast. The setting fully replaces the banner only for client-side notices: the ones
-pushed by `PhoneNotify` and by the `Notify` export.
+`ox_lib` toast. The setting fully replaces the banner only for client-side notices: the phone's
+own short client messages (such as "phone disabled") and the client `Notify` export.
+
+Short server messages that only exist as a toast (no phone item when trying to open, earbuds
+paired, connected or disconnected, earbuds not carried when music starts) are shown only with
+`'oxlib'` or `'both'`. With `'phone'`, a player without
+the item who presses the key gets no message.
 {% endhint %}
 
 ## Video calls (FaceTime)
 
 During a video call, the phone's camera acts as a webcam: each player sends their own game
 render to the other. **The image never passes through your server:** it travels player to
-player, and the server only relays the few signalling messages.
+player, or through a TURN relay when no direct route exists, and the server only relays the
+few signalling messages.
+
+{% hint style="warning" %}
+**On a public server, set up a TURN relay in [config/turn.lua](config-turn.md)** (free
+Cloudflare account). With the STUN server alone, players behind a 4G box, CGNAT, strict NAT or a
+VPN get the sound but no picture.
+{% endhint %}
+
+InstaPic live streams use the same block: `framing`, `longEdgePx`, `fps` and `iceServers` apply to
+them too, and `enabled = false` makes lives run without any picture (comments and viewers only;
+the server console says so at startup). A missing `Config.VideoCall` block counts as
+`enabled = false`.
 
 ```lua
 Config.VideoCall = {
@@ -78,21 +98,27 @@ Config.VideoCall = {
 | `longEdgePx` | `number` | `640` | 160 to 1280 | Long edge of the stream sent. Above 640 the thumbnail gains nothing visible and bandwidth climbs |
 | `fps` | `number` | `24` | 5 to 30 | Frames per second sent |
 | `framing` | `number` | `0.35` | 0.05 to 0.95 | Where to aim inside the game image in selfie mode |
-| `iceServers` | `table` | one Google STUN entry | - | Servers that help the two players find each other |
+| `iceServers` | `table` | one Google STUN entry | - | Servers that help the two players find each other: STUN, and optionally your own TURN server |
 
 Values outside the accepted range are clamped, not refused.
 
 **About `framing`.** In selfie mode GTA does not place the character in the middle of the
-screen: they sit to the left. `0.5` is the centre of the screen, `0.30` clearly to the left,
-`0.70` to the right. If your correspondent sees you too far to the **right** of their screen,
-lower the value. The change applies to the next call, with nothing to rebuild.
+screen: they sit to the left. `framing` is the horizontal centre of the part of the game image
+that is sent: `0.5` is the centre of the screen, `0.30` clearly to the left, `0.70` to the right.
+If your correspondent sees you cut off on the **left** of their screen, lower the value; if they
+see you too far to the **right**, raise it. The change applies after a resource restart.
 
-**About `iceServers`.** A STUN server tells both players their public address; the free Google
-one is enough in most cases. A **TURN** server *relays* the image when a direct connection is
-impossible (players behind CGNAT, some 4G routers, corporate networks). Without TURN those
-players get sound but no image: the rest of the call works normally. TURN is rented or
-self-hosted (coturn); uncomment the second block and paste your credentials, keeping the UDP,
-TCP and TLS entries, which is what gets through the most firewalls.
+**About `iceServers`.** A STUN server tells both players their public address; it is only
+enough when both networks accept a direct connection. A **TURN** server *relays* the image when
+a direct connection is impossible (4G boxes, CGNAT, strict NAT, VPN). Without TURN those players
+get sound but no image: the rest of the call works normally.
+
+The recommended relay is Cloudflare, set in [config/turn.lua](config-turn.md): the API token
+stays on the server, and its servers are added after this list. To use your own TURN server
+instead (coturn, or another provider with fixed credentials), uncomment the second block and
+paste your credentials, keeping the UDP, TCP and TLS entries, which is what gets through the
+most firewalls. This file is a shared script and the list is sent to every player, so these
+credentials can be read by anyone on your server.
 
 ```lua
 -- {
@@ -101,7 +127,7 @@ TCP and TLS entries, which is what gets through the most firewalls.
 --         'turn:turn.example.com:3478?transport=tcp',
 --         'turns:turn.example.com:5349?transport=tcp',
 --     },
---     username = 'user',
+--     username = 'username',
 --     credential = 'password',
 -- },
 ```
@@ -117,7 +143,7 @@ here; nothing is imposed.
 ```lua
 Config.Brand = {
     name = 'NASH',
-    studio = 'Nash',
+    studio = 'Nash Store',
     site = {
         label = 'NASH Store',
         url = 'nash-store.com',
@@ -131,8 +157,8 @@ Config.Brand = {
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `name` | `string` | `'NASH'` | Replaces the word visible to players: network operator in Settings › SIM, the account ID at the top of Settings, the device name in Settings › General › About, the Settings footer, and the sender of social-network verification codes |
-| `studio` | `string` | `'Nash'` | Publisher shown on App Store pages. The suffix is added by the phone: `'Nash'` gives *Nash Arcade*, *Nash Labs*, *Nash Finance* |
+| `name` | `string` | `'NASH'` | Replaces the word visible to players: the carrier in Settings › SIM, the account ID at the top of Settings, the Wi-Fi network name (`NASH_5G`), the device name in Settings › General › About, the Settings footer, the "Data and privacy" screen of the first-run setup, and the sender of a verification code for an app that has no sender name of its own (the six social apps sign their codes with their own name) |
+| `studio` | `string` | `'Nash Store'` | Publisher shown on the App Store page of **every** app, written exactly as you set it (no suffix is added) |
 | `site.label` | `string` | `'NASH Store'` | Short name under the Browser's bookmark icon |
 | `site.url` | `string` | `'nash-store.com'` | Address displayed on that bookmark. No real navigation happens: the Browser is decorative |
 | `site.title` | `table` | `fr` and `en` entries | Title listed under "Frequently visited", **one value per language**, keyed by language code |
@@ -157,7 +183,8 @@ Config.Mail = {
 A character's address is built the first time they open the Mail app, from their RP name:
 `john.doe@ls-mail.com`. It is then **frozen**, because it is a destination: changing it would
 break the mail of everyone who wrote it down. Two characters with the same name get a suffix
-(`john.doe2@…`).
+(`john.doe2@…`). The domain is written in lower case, and changing it only affects addresses
+created afterwards. Empty, it falls back to `ls-mail.com`.
 
 ## byCloud account
 
@@ -193,46 +220,28 @@ Accounts created before the update that introduced an owner have none recorded: 
 openable by anyone, even at `false`. There is no way to guess who created them, and closing
 them would lock their real owner out with no recourse.
 
-## Test commands
-
-```lua
-Config.Debug = false
-Config.DebugGroups = { 'admin', 'superadmin' }
-```
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `Config.Debug` | `boolean` | `false` | Opens a set of commands that exercise the phone on its own: fake an incoming mail, a received message, a call, a story, a transfer. Type `/phonehelp` in game for the list |
-| `Config.DebugGroups` | `table` | `{ 'admin', 'superadmin' }` | Framework groups allowed to run them once `Config.Debug` is on |
-
-{% hint style="danger" %}
-Leave `Config.Debug` at `false` in production. These commands write to the database and push
-events in the player's name: open, they hand whoever finds them a way to grant themselves bank
-transfers. Even when enabled they stay restricted to administrators, but the real barrier is
-this boolean.
-{% endhint %}
-
-The server console always has access, since it already administers the server. The ACE
-`nash_phone.debug` keeps working alongside the group list, for owners who prefer FiveM's native
-permission system:
-
-```cfg
-add_ace identifier.license:XXX nash_phone.debug allow
-```
-
-An empty `Config.DebugGroups` means no group qualifies, and the ACE becomes the only path.
-
 ## Opening the phone
 
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `Config.OpenKey` | `string` | `'F1'` | Default key binding |
 | `Config.OpenCommand` | `string` | `'phone'` | Chat command: `/phone` |
+| `Config.LookKey` | `string` | `'LMENU'` | Default key that frees the mouse to look around while the phone is open |
 
 `Config.OpenKey` is registered through `RegisterKeyMapping`, so it is a **default**: each player
 can remap it in FiveM's own key settings, and a binding a player has already stored wins over a
 later change here. Setting `Config.OpenKey` to an empty string registers the command without any
 key.
+
+The same command or key closes the phone when it is open, except during a call or a live stream.
+Keep `Config.OpenCommand` filled in: it has no fallback value. Escape and Backspace also close
+it; the right mouse button does not.
+
+`Config.LookKey` (Left Alt by default) works like the open key: it is a default each player can
+remap. While the phone is open, it hides the cursor and gives the mouse back to the game camera,
+so the player can look around while walking with the phone in hand; pressing it again brings the
+cursor back. It does nothing while the Camera app is open, which has its own Left Alt binding.
+An empty string registers no key.
 
 ## Phone item
 
@@ -250,10 +259,12 @@ The resource creates **no item:** your inventory declares items, not the phone. 
 `Config.UseItem = true`, the item below must exist on your side and be in the player's pockets.
 
 {% hint style="danger" %}
-There is no escape hatch. `/phone` and the key binding go through the same server check
-(`server/main.lua`, `requestOpen`). If the item does not exist, nobody opens the phone: not
-players, not admins. The server prints a red warning in the console at startup when it detects
-this case. Two ways out: create the item, or set `Config.UseItem = false`.
+There is no escape hatch. `/phone`, the key binding and the client exports `ToggleOpen` and
+`OpenApp` go through the same server-side item check. If the item does not exist, nobody opens
+the phone: not players, not admins. About fifteen seconds after startup, the server prints a red
+block in the console when it detects this case, starting with
+`[nash_phone] Config.UseItem = true but the item "phone" DOES NOT EXIST`. Two ways out: create
+the item, or set `Config.UseItem = false`.
 {% endhint %}
 
 **ox_inventory:** add the entry to `ox_inventory/data/items.lua`:
@@ -269,9 +280,13 @@ this case. Two ways out: create the item, or set `Config.UseItem = false`.
 },
 ```
 
-ox_inventory forwards item use to `ESX.RegisterUsableItem`, which the resource already
-registers: nothing else to do. And if your version did not forward it, a player holding the
-item still opens their phone with `/phone` or the key.
+ox_inventory forwards item use to the framework's usable-item registration
+(`ESX.RegisterUsableItem` on ESX), which the resource already fills: nothing else to do. And if
+your version did not forward it, a player holding the item still opens their phone with `/phone`
+or the key.
+
+Receiving **another** phone item replays the first-run setup: see
+[A new phone asks again](config-setup.md#a-new-phone-asks-again).
 
 **ESX default inventory** (the `items` table): import the supplied `sql/item_phone.sql`, or
 run:
@@ -321,18 +336,19 @@ character was created. Scripts that stored the old number elsewhere keep the old
 {% endhint %}
 
 Numbers are generated once per identifier, checked for uniqueness, and **never change hands**:
-there is no `UPDATE` and no `DELETE` on the numbers table anywhere in the resource, not even in
-the test commands.
+nothing in the resource rewrites a stored number, and nothing deletes a row of the numbers table.
+Changing `prefix` or `digits` therefore only affects the numbers generated afterwards: existing
+players keep theirs.
 
 {% hint style="warning" %}
 The column is `VARCHAR(16)`. `prefix` + `-` + `digits` must stay at or under 16 characters,
 otherwise, depending on your SQL mode, assigning a number either fails or silently truncates.
-`/phonecheck` flags this before your players do.
+Nothing checks this length at startup: count the characters before you change either value.
 {% endhint %}
 
 ## NearShare
 
-Sharing a contact card with players **nearby**.
+Sharing a contact card, a photo or a video with players **nearby**.
 
 ```lua
 Config.NearShare = {
@@ -368,7 +384,8 @@ Config.Notifications = {
 | `keepDays` | `number` | `30` | Days a notification is kept, read or not. `0` disables that sweep |
 
 The sweep runs one minute after startup (to let the schema create itself on a first boot), then
-every hour, across all players. With both values at `0` the loop exits and never runs again.
+every hour, across all players. With both values at `0` (or both keys removed) the loop exits and
+never runs again.
 
 This is the **table-wide** cleanup. Clearing **one player's** notifications when they join or
 leave is a different file: [config/notifications.lua](config-notifications.md).
@@ -389,21 +406,27 @@ Config.Prop = {
 |---|---|---|---|
 | `model` | `string` | `'custom_phone_prop'` | Prop model, streamed by the `nash-phoneprop` resource |
 | `fallback` | `string` | `'prop_npc_phone_02'` | GTA prop used when the model above cannot be loaded |
-| `bone` | `number` | `28422` | Bone index: right hand (`IK_R_Hand`) |
+| `bone` | `number` | `28422` | Ped bone the prop is attached to: the right hand |
 | `offset` | `vec3` | `vec3(0.0, 0.0, 0.0)` | Attachment offset |
 | `rotation` | `vec3` | `vec3(0.0, 0.0, 0.0)` | Attachment rotation |
+| `skin` | `table` | see below | Coloured shell of the prop |
 
 If the prop resource is not started, the model does not exist and the phone would be invisible
-in the hand, so the fallback takes over: an approximate phone beats an empty hand. `offset` and
-`rotation` are both zero and look removable: they are not. Deleting them raises an error out of
-the attach path, and the player ends up with a full-screen phone but no control loop, free to
-shoot and drive.
+in the hand, so after waiting up to 2.5 seconds for the model the fallback takes over: an
+approximate phone beats an empty hand. The client console then prints, once, that the model was
+not found and asks whether the prop resource is started **before** `nash_phone`. A missing
+`bone`, `offset` or `rotation` falls back to the values above, but keep the `Config.Prop` block
+itself: it has no fallback. Without `model`, every player holds the `fallback` prop.
+
+`bone`, `offset` and `rotation` can be overridden for a single animation, see
+[Animations with the prop](#animations-with-the-prop).
 
 ### Coloured shell
 
 The prop's frame follows the colour picked in Settings › Display › Frame colour, with no
 restart. The model is not duplicated: the three textures that carry the colour are swapped in
-memory inside the prop's dictionary. One `.ydr`, no extra streamed asset.
+memory inside the prop's dictionary. One `.ydr`, no extra streamed asset. `skin` sits inside
+`Config.Prop`:
 
 ```lua
 skin = {
@@ -423,23 +446,31 @@ skin = {
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `enabled` | `boolean` | `true` | `false` leaves the prop on its original texture |
-| `txd` | `string` | `'custom_phone_prop'` | Texture dictionary, as it exists in the prop's `.ytd` |
-| `textures` | `table` | see above | Names of the three textures replaced |
-| `colors` | `table` | 4 entries | One set per colour offered in Settings |
-| `default` | `string` | `'cosmic'` | Colour applied before the player picks one |
+| `txd` | `string` | `'custom_phone_prop'` | Texture dictionary, as it exists in the prop's `.ytd`. Only change it if the prop is rebuilt |
+| `textures` | `table` | see above | Names of the three textures replaced (`body`, `light`, `back`). Only change them if the prop is rebuilt |
+| `colors` | `table` | 4 entries | One finish per colour offered in Settings |
+| `default` | `string` | `'cosmic'` | Colour used when the player's saved colour is unknown or has no entry in `colors`. A new player's phone starts on `cosmic` in Settings, whatever this value |
 
-`body` and `light` are flat colours built in memory; `back` is the camera block, a real image.
+Each entry of `colors` takes:
+
+| Field | Description |
+|---|---|
+| `body` | Flat colour of the frame, as `'#RRGGBB'` |
+| `light` | Flat colour of the faces catching the light, as `'#RRGGBB'` |
+| `back` | Image of the back (camera block), as a path inside the `nash_phone` resource. Keep your images in `assets/prop/` as PNG: that is the folder `fxmanifest.lua` declares (`assets/prop/*.png`) |
+
+A `body` or `light` that is not a six-digit hex colour makes the phone ignore that colour, with
+one line in the client console. A `back` image that cannot be loaded keeps the original back of
+the model, also with a console line.
 
 {% hint style="warning" %}
 The colour swap is **local to each player**. On their screen every phone takes their colour,
 including other players'. That is the limit of the method, and it is accepted as such.
 {% endhint %}
 
-Three lists must agree: the colour identifiers here, the swatches in the phone's Settings, and
-the server's own whitelist (`frameColor`, currently `deepblue`, `cosmic`, `silver`, `black`). If
-an identifier is missing from one of them, nothing errors: the player taps a swatch and either
-nothing happens at all, or the on-screen frame changes colour while the prop held in hand stays
-on the old one.
+The colour identifiers are fixed: `deepblue`, `cosmic`, `silver` and `black` are the four swatches
+of Settings, and the server only accepts these four. You can change the finish of each one, but
+not rename them or add a fifth: a renamed or extra entry is never selected.
 
 **The pair rule:** `light` must always be **lighter** than `body`. It is the flat colour of the
 faces catching the light; if it drops below its `body`, the area meant to brighten darkens
@@ -448,6 +479,113 @@ looks dull.
 
 The `back` images are recoloured **offline**. Changing a `body` here does not change the
 matching back: the PNG has to be regenerated.
+
+## Animations with the prop
+
+While the phone is open, the character plays an animation that matches what the phone is doing:
+taking it out, reading the screen, holding it to the ear during a call, turning it sideways,
+filming, putting it away. There is one set of animations per situation: **on foot**, **driver**
+and **passenger**.
+
+```lua
+Config.Animations = {
+    enabled = true,
+    replay = true,
+    onFoot = {
+        dict = 'cellphone@',
+        open = 'cellphone_text_in',
+        idle = 'cellphone_text_read_base',
+        close = 'cellphone_text_out',
+        toCall = 'cellphone_text_to_call',
+        call = 'cellphone_call_listen_base',
+        toScreen = 'cellphone_call_to_text',
+        closeCall = 'cellphone_call_out',
+        toLandscape = 'cellphone_horizontal_intro',
+        landscape = 'cellphone_horizontal_base',
+        toPortrait = 'cellphone_horizontal_outro',
+        closeLandscape = 'cellphone_horizontal_exit',
+        camera = 'cellphone_photo_idle',
+        selfie = 'cellphone_photo_idle',
+    },
+    driver = {
+        dict = 'anim@cellphone@in_car@ds',
+        -- same states as onFoot, without camera and selfie
+    },
+    passenger = {
+        dict = 'anim@cellphone@in_car@ps',
+        -- same states as onFoot, without camera and selfie
+    },
+}
+```
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | `boolean` | `true` | `false` plays no animation at all: the prop stays in the hand, the character does not move |
+| `replay` | `boolean` | `true` | Plays the pose again when the game or another script interrupts it |
+| `onFoot` | `table` or `false` | see above | Animations on foot |
+| `driver` | `table` or `false` | `anim@cellphone@in_car@ds` set | Animations in the driver's seat |
+| `passenger` | `table` or `false` | `anim@cellphone@in_car@ps` set | Animations in any other seat |
+
+### States
+
+| State | Played | When |
+|---|---|---|
+| `open` | once | The phone is taken out |
+| `idle` | in a loop | Phone in hand, screen facing the player |
+| `close` | once | The phone is put away |
+| `toCall` | once | The phone goes from the screen to the ear |
+| `call` | in a loop | Voice call held to the ear (not on speaker, not minimized, not a video call) |
+| `toScreen` | once | The phone comes back from the ear to the screen (speaker turned on, call minimized or ended) |
+| `closeCall` | once | The phone is put away from the ear |
+| `toLandscape` | once | The screen turns sideways |
+| `landscape` | in a loop | Screen held horizontally |
+| `toPortrait` | once | The screen turns back upright |
+| `closeLandscape` | once | The phone is put away while held sideways |
+| `camera` | in a loop | Camera in use |
+| `selfie` | in a loop | Front camera, video call, live stream |
+
+`toCall`, `toScreen`, `toLandscape` and `toPortrait` are only played between `idle` and `call`,
+and between `idle` and `landscape`. Any other change (opening the camera, getting into or out of
+a vehicle) switches straight to the loop of the new state. Putting the phone away plays
+`closeCall` from a call held to the ear, `closeLandscape` from a sideways screen, and `close`
+otherwise; the prop is removed once that animation ends.
+
+### What each state accepts
+
+- **An animation name**, taken from the `dict` of its block: `idle = 'cellphone_text_read_base'`.
+  A block without `dict` uses `'cellphone@'`.
+- **A table**, to set everything for that state:
+  `{ dict = '...', anim = '...', flag = 49, bone = 28422, offset = vec3(...), rotation = vec3(...) }`.
+  Only `anim` is required. `dict` defaults to the block's one. `flag` defaults to `49` for a loop
+  and `50` for a one-shot transition. `bone`, `offset` and `rotation` move the prop during that
+  animation only, instead of the values of `Config.Prop`.
+- **`false`**, to play nothing in that state.
+
+### Fallbacks
+
+A state that is **missing** (not written at all, which is different from `false`) is looked up
+elsewhere:
+
+1. In the other blocks: a state missing from `passenger` is taken from `driver`, then from
+   `onFoot`; a state missing from `driver` is taken from `onFoot`. This is why the shipped
+   `driver` and `passenger` blocks have no `camera` or `selfie`: in a vehicle, those two come from
+   `onFoot`, with the `onFoot` dictionary.
+2. Then in a related state: `selfie` falls back to `camera`, `camera` and `landscape` to `idle`,
+   `closeCall` and `closeLandscape` to `close`.
+
+A whole block set to `false` plays nothing in that situation (for example `driver = false` keeps
+drivers still). A missing `onFoot` block uses the shipped one, and a missing `Config.Animations`
+block behaves like the shipped `onFoot` set with `enabled` and `replay` on.
+
+### Good to know
+
+- No animation is started while the character is dead, ragdolling, falling, swimming, climbing,
+  cuffed or getting into a vehicle.
+- `replay` is capped: if the pose is interrupted three times within five seconds, the phone stops
+  replaying it until the next change of state.
+- A dictionary or an animation that does not exist prints one line in the client console
+  (`Config.Animations : dictionnaire « ... » introuvable` or `animation « ... » absente de « ... »`)
+  and that state is skipped.
 
 ## Voice and speaker
 
@@ -468,9 +606,9 @@ Config.Voice = {
 | `provider` | `string` | `'pma-voice'` | Voice resource used during calls |
 
 {% hint style="warning" %}
-`pma-voice` is the only provider with an implementation. Any other value leaves the voice layer
-a no-op: the call rings, the call screen works and the signalling goes through, but no voice
-channel is ever joined and the two players do not hear each other.
+`pma-voice` is the only supported provider. Any other value leaves the voice layer a no-op: the call rings, the call screen works
+and the signalling goes through, but no voice channel is ever joined and the two players do not
+hear each other.
 {% endhint %}
 
 ### Speaker
@@ -509,14 +647,6 @@ before the ceiling is applied, so the ones kept are the closest, not whoever hap
 first in the player list.
 
 ## Music (proximity audio)
-
-{% hint style="danger" %}
-This block is **dead as shipped**. `config/music.lua` assigns `Config.Music` as a whole and is
-loaded after `config/main.lua`, so these four values are replaced and never read. The hard-coded
-fallbacks below apply instead: they happen to be the same numbers, which is why nothing looks
-broken until you change one and nothing happens. To actually change them, add them to the
-`Config.Music` table in [config/music.lua](config-music.md). `/phonecheck` reports this.
-{% endhint %}
 
 ```lua
 Config.Music = {
@@ -570,8 +700,10 @@ item keeps a value, which is the realistic outcome. At `false`, once paired they
 even without the item.
 
 The resource creates no item here either; see `sql/item_earbuds.sql` for the default ESX
-inventory. Without xsound there is no music to route, so the setting stays visible but has
-nothing to do.
+inventory. About fifteen seconds after startup, the server console warns when the item does not
+exist in your inventory. Without xsound there is no music to route, so the setting stays visible
+but has nothing to do. A missing `Config.Earbuds` block, or an empty `itemName`, turns the
+feature off.
 
 ## Camera
 
@@ -654,7 +786,7 @@ Config.Gallery = {
 | `Import.Enabled` | `boolean` | `true` | - | `false` hides the **+** button, and the server refuses imports. Copy, Duplicate and the Recently Saved collection are not affected |
 | `Import.MaxMegabytes` | `number` | `15` | 1 to 50 | Heaviest original file accepted, in megabytes. The player's error message quotes this number |
 | `Import.MaxSidePx` | `number` | `8192` | 1024 to 16384 | Largest width or height of the original accepted, in pixels. Read from the file header, before the picture is decoded |
-| `Import.AllowedHosts` | `table` | `{ 'fivemanage.com' }` | - | Hosts where the server agrees to **store** an imported picture. Each entry also covers its subdomains, so `fivemanage.com` covers `r2.fivemanage.com`. The address must be `https` |
+| `Import.AllowedHosts` | `table` | `{ 'fivemanage.com' }` | - | Hosts where the server agrees to **store** an imported picture, and also a Camera photo or video. Each entry also covers its subdomains, so `fivemanage.com` covers `r2.fivemanage.com`. The address must be `https` |
 
 Values outside the accepted range are brought back to the nearest bound, not refused: a
 `MaxMegabytes = 0` left by mistake gives 1 MB, not a feature that silently refuses every
@@ -667,13 +799,15 @@ The **+** button only appears when `Enabled` is `true` **and** an image host is 
 `config/upload.lua`: without a host there is nowhere to put the file.
 
 The picture itself follows the [Camera](#camera) settings: saved as WebP, long edge at most
-`Camera.Photo.LongEdgePx`, quality `Camera.Photo.Quality`. A smaller picture is not enlarged.
+`Camera.Photo.LongEdgePx`, quality `Camera.Photo.Quality` (for imports, these two are kept within
+320 to 4096 pixels and 0.1 to 1.0). A smaller picture is not enlarged.
 Re-encoding removes the EXIF metadata (GPS position included), and an animated GIF keeps only
 its first frame. Accepted formats are JPEG, PNG, GIF and WebP, recognised from the content of
 the file rather than from its name.
 
-Each import costs up to two uploads (the picture and its thumbnail) out of the 12 per minute a
-player is allowed: it is the same counter as the Camera. A link that is already on Fivemanage is
+Each import costs up to two upload addresses (the picture and its thumbnail) out of the 24 a
+player can get per minute, and counts among the 20 photos, videos and imports a player can save
+per minute: these are the same counters as the Camera. A link that is already on Fivemanage is
 re-hosted like any other: Fivemanage serves every account's files from the same addresses, so
 the phone cannot tell your files from another server's.
 
@@ -703,13 +837,15 @@ uploads come back with addresses on that domain, and the server refuses them unt
 AllowedHosts = { 'fivemanage.com', 'media.yourserver.com' },
 ```
 
-Without that line, every import fails at the very last step, after the file was uploaded. The
-player gets "Something went wrong. Try again.", the uploaded file stays unused in your
-Fivemanage storage, and the Camera keeps working, because it does not go through this check.
-That combination is the tell-tale sign.
+The same list is also checked when a **Camera** photo or video is saved, whether or not
+`Enabled` is `true`. Without that line, every import, photo and video fails at the very last
+step, after the file was uploaded: the player gets an error, the uploaded file stays unused in
+your Fivemanage storage, and the server console prints, once, that the address returned by the
+host is not covered by `Config.Gallery.Import.AllowedHosts`. That combination is the tell-tale
+sign.
 
-**How entries are read.** Write host names only. What an owner naturally types is tolerated and
-cleaned up: capital letters, a leading `https://`, a trailing path or slash, a leading `*.`. An
+**How entries are read.** Write host names only (a single host may also be written as a plain
+string). What an owner naturally types is tolerated and cleaned up: capital letters, a leading `https://`, a trailing path or slash, a leading `*.`. An
 entry with no dot at all (`'com'`) is ignored, since it would open a whole top-level domain, and
 the server console lists every ignored entry at startup. A list that ends up empty falls back to
 `fivemanage.com`, with a warning: to turn the feature off, use `Enabled = false`, not an empty

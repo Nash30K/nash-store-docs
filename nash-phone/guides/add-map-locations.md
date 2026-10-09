@@ -31,8 +31,7 @@ printed in the F8 console, already filled in with the street and the zone:
     },
 ```
 
-`/phonepos` is always available: it is not one of the debug commands and does not need
-`Config.Debug`.
+`/phonepos` is always available, to every player, with nothing to turn on.
 
 ## 2. Paste the block into `Config.Map.Points`
 
@@ -161,12 +160,6 @@ Config.Map.Travel = {
 4. To verify, add a location on a very recognisable landmark and look at where the pin lands on
    the map. With the shipped bounds it lands on the landmark: if it does not, its `coords` are
    wrong, or the bounds were modified.
-5. With `Config.Debug = true`, `/phoneconfig` reports how many points and categories the
-   server actually read, and `/phonecheck` flags wrong bounds explicitly:
-
-    ```
-    bornes de carte hors proportion des tuiles : les lieux de Plans tombent a cote.
-    ```
 
 {% hint style="warning" %}
 **A location that is missing `id`, `name` or a readable `coords` is dropped silently:** no

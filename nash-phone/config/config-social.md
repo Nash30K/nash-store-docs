@@ -1,7 +1,7 @@
 # config/social.lua
 
 What players see of each other in the social applications: story reach, notification cleanup,
-the Snapz map, and InstaPic live streams.
+the Snapz map, InstaPic live streams, and the Cindr dating app.
 
 File: `config/social.lua`, loaded as a shared script after `config/main.lua`.
 
@@ -9,8 +9,8 @@ Nothing in this file is a technical setting. Everything below is visible on scre
 game. Which social apps exist at all, and whether they start installed or have to be
 downloaded from the App Store, is set in [config/apps.lua](config-apps.md).
 
-All four blocks are read live, never cached: a `restart nash_phone` applies a change without
-anyone having to reconnect.
+All five blocks are read on each request, never cached by the phone: a `restart nash_phone`
+applies a change without anyone having to reconnect.
 
 ## Config.Social.StoriesAudience
 
@@ -221,23 +221,50 @@ positions on a server that had just closed it. The phone reports that case once 
 ## Config.Social.Live
 
 InstaPic live streams. A live broadcasts the **actual game view** of the player who starts it
-to the people watching. The image never passes through the server: it goes straight from one
-player to the other, exactly like a video call. The server only relays the handful of messages
-the two browsers need to find each other.
+to the people watching, with the microphone of the host and of the guests on screen. Picture
+and sound never pass through the server: they go straight from one player to the other, exactly
+like a video call. The server only relays the handful of messages the two browsers need to find
+each other.
 
 ```lua
 Live = {
     enabled = true,
     maxViewers = 8,
-    defaultAudience = 'followers',
+    audience = 'followers',
+    microphone = true,
 },
 ```
 
 | Setting | Default | Meaning |
 | ------- | ------- | ------- |
 | `enabled` | `true` | `false` keeps the button visible but the server refuses to start: the app shows a clear refusal instead of a dead button |
-| `maxViewers` | `8` | Most viewers per live. Clamped to the 1-24 range |
-| `defaultAudience` | `'followers'` | Value proposed on the launch screen. `'everyone'`, `'followers'` or `'none'` |
+| `maxViewers` | `8` | Most viewers per live. Clamped to the 1 to 24 range |
+| `audience` | `'followers'` | Who is **notified** when a live starts: `'everyone'`, `'followers'` or `'none'`. An unknown value gives `'followers'` |
+| `microphone` | `true` | Viewers hear the host and the guests on screen through their microphone, captured by the phone. `false` gives silent lives: no audio channel and no mic button. Any value other than `false` counts as `true` |
+
+Lives carry picture and sound only when `Config.VideoCall.enabled` is `true` in
+[config/main.lua](config-main.md#video-calls-facetime), which also sets the framing, resolution and
+frame rate of the stream. With video calls off, lives run with comments and viewers only, and the
+server console says so at startup.
+
+### Sound
+
+- **Only the microphone is sent.** The game's own sound never is: the embedded browser never
+  receives GTA's audio mix. The sound travels with the picture, not through `pma-voice`, so a
+  player with no route to the host (see [config/turn.lua](config-turn.md)) gets neither.
+  `Config.Camera.Recording.Microphone` has no effect on lives.
+- **Only the host and the guests on screen are heard.** A viewer's microphone is never captured.
+- **Mic button.** The host and the guests get a button next to the camera flip button. It mutes
+  and unmutes without reconnecting anyone.
+- **No microphone.** When the microphone is refused, missing or has not answered after 5
+  seconds, the live goes on with picture only and viewers see no error. The button then shows a
+  red crossed-out mic: clicking it asks for the microphone again. A microphone that answers late
+  is added to the live, and viewers lose the picture for a moment while the connection is
+  rebuilt.
+- **During a phone call.** The host and the guests stop sending picture and sound until they
+  hang up. A viewer in a call stops hearing the live until they hang up.
+- **Volume** follows the phone's volume (Control Center slider and side buttons). If the sound
+  does not start on its own, it starts at the next click inside the live screen.
 
 ### Why the viewer cap is low
 
@@ -258,8 +285,10 @@ anyone off.
 
 ### Audience
 
-`defaultAudience` is only the value proposed on the launch screen; the player changes it at the
-moment they go live.
+`audience` is a server-wide setting: it applies to every live, and the player does not choose it.
+It only decides who receives the "live started" notification. **Whatever the value, only the
+broadcaster's followers can watch**: a player who does not follow the host is refused when
+joining.
 
 | Value | Who is told |
 | ----- | ----------- |
@@ -270,6 +299,9 @@ moment they go live.
 The notification stays **inside the phone**. It never draws over the game screen, unlike an
 incoming call.
 
+An older file may still write `defaultAudience`: it is read the same way when `audience` is
+absent. When both are filled with different values, `audience` wins and the console says so.
+
 ### Fixed limits
 
 These are not configurable:
@@ -279,7 +311,9 @@ These are not configurable:
 | Guests on screen | The host plus 3. The panel is tall and narrow, past that nothing is visible |
 | Live title | 60 characters |
 | Comment | 200 characters |
+| Comments per player | 5 every 5 seconds |
 | Chat lines kept for latecomers | 60 |
+| Starting a live | Once per minute per character, never during a call |
 
 A live has **no SQL table**, by design: it only means anything while the broadcaster is
 connected. An interrupted live is a finished live, and nothing is restored after a restart.
@@ -288,16 +322,53 @@ The list of ongoing lives only ever returns lives from accounts the requester al
 plus their own. Returning "every live on the server" would hand out a directory of connected
 players, which the whole social layer refuses to do.
 
+## Config.Social.Dating
+
+Cindr, the dating app: a deck of profiles to like or pass, matches, and a conversation only
+once both players liked each other. Whether the app exists at all, and whether it has to be
+downloaded, is set in [config/apps.lua](config-apps.md) (`cindr`).
+
+```lua
+Dating = {
+    enabled = true,
+    deckSize = 12,
+    minAge = 18,
+    maxAge = 99,
+    maxPhotos = 6,
+    shareZone = true,
+    undoSeconds = 300,
+    reports = true,
+},
+```
+
+| Setting | Default | Accepted range | Meaning |
+| ------- | ------- | -------------- | ------- |
+| `enabled` | `true` | - | `false` makes the server refuse every Cindr action. Profiles, matches and conversations are kept and come back when you turn it on again |
+| `deckSize` | `12` | 1 to 50 | Profiles sent to the player at once |
+| `minAge` | `18` | 18 to 99 | Youngest age a player can declare on their profile. It can never go below 18 |
+| `maxAge` | `99` | `minAge` to 120 | Oldest age a player can declare |
+| `maxPhotos` | `6` | 1 to 6 | Photos per profile |
+| `shareZone` | `true` | - | `true` lets players show their neighbourhood on their profile, if they choose to. `false` hides it on every profile and stops saving it |
+| `undoSeconds` | `300` | 0 to 3600 | How long the player can undo their last like or pass, in seconds. `0` removes the time limit; it does not disable undo |
+| `reports` | `true` | - | `false` refuses reports. When on, each report is stored, printed in the server console and sent to the `cindr_report` log of [config/logs.lua](config-logs.md). There is no automatic sanction |
+
+Values outside the accepted range are brought back to the nearest bound. A `Dating` block that is
+not a table is ignored with one console line, and the shipped values apply.
+
+Fixed limits, not configurable: 5 interests and a 500-character bio per profile, 30 deck
+requests and 90 likes or passes per minute, 5 reports every 5 minutes per player. An undo is
+refused once the two players have matched.
+
 ## Checking what the server applied
 
-With `Config.Debug = true` in [config/main.lua](config-main.md):
+There is no command that prints this file back. What the server could not apply is reported in
+the server console, once, with the value it used instead:
 
-| Command | What it shows |
-| ------- | ------------- |
-| `/phoneconfig` | Everything this file produced, including the raw value next to the applied one, so a typo is visible |
-| `/phonesnapmap [handle]` | Why the Snapz map shows, or does not show, someone: lock by lock |
-| `/phonesocialnotifs <app> [days]` | Writes notifications that are born already old, so the cleanup can be observed without waiting a week. One read row and one unread row per pass, which is what makes `purgeOnJoin` visible |
-| `/phonesocialnotifs purge` | Runs the age sweep immediately |
-| `/phonelive` | Ongoing lives: host, viewer count, guests, title |
-| `/phonelivewho` | Who would be notified if you went live right now |
-| `/phonesocial` | Your own social accounts and their handles |
+| Block | When the line is printed |
+| ----- | ------------------------ |
+| `StoriesAudience`, `Notifs`, `SnapMap`, `Dating` | The first time the setting is read after a restart: a block that is not a table, or an unknown value of `StoriesAudience` or `Notifs.purgeOnJoin` |
+| `Live` | About two seconds after startup, when `audience` and `defaultAudience` disagree, or when lives are on while `Config.VideoCall.enabled` is `false` |
+
+Everything else is visible in game: open the app and check what it shows. Cindr reports are
+printed in the server console as they arrive, and stored in the `nash_phone_dating_reports`
+table, which you can read with SQL.

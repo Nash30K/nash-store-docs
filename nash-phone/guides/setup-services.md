@@ -21,7 +21,7 @@ the single line that stops a modified client from declaring itself police.
 
 ## 1. Declare your businesses
 
-The **order of `list` is the display order**. To move Taxi above Mechanic, move its block -
+The **order of `list` is the display order**. To move Taxi above Mechanic, move its block:
 there is no `order` field to keep in sync.
 
 ```lua
@@ -63,14 +63,17 @@ Config.Services = {
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | `job` | `string` | **Exact** job name on the framework side. It is the only thing the server looks at to know who works here, and it must match character for character |
-| `label` | `string` | Displayed name. It is **not** translated: "Police" stays "Police" in both languages, like a proper noun. Leave it empty to use the phone's own translation. Truncated to 48 characters |
-| `place` | `string` | Location shown under the name. Decorative |
+| `label` | `string` | Displayed name. It is **not** translated: "Police" stays "Police" in both languages, like a proper noun. Left empty, the raw `job` name is displayed instead. Truncated to 48 characters |
+| `place` | `string` | Location shown under the name. Decorative. Truncated to 48 characters |
 | `icon` | `string` | Image filename in the resource's `service_icons/` folder |
 | `accent` | `string` | Colour of the badge, in hexadecimal |
 | `canCall` | `boolean` | The citizen can call this service |
 | `canMessage` | `boolean` | The citizen can send it a written request |
-| `multiResponders` | `boolean` | `true`: several employees can answer the same request. The first one takes it, the others see "Taken by X" and can join: what you want for police and EMS. `false`: first come, first served, the request disappears for the others: what you want for a taxi or a mechanic: one job, one customer |
+| `multiResponders` | `boolean` | `true`: several employees can answer the same request. The first one takes it, the others see "Taken by X" and can join: what you want for police and EMS. `false`: first come, first served. Once an employee takes the request, the others still see it as "Taken by X" but can no longer take it: what you want for a taxi or a mechanic (one job, one customer) |
 | `shareLocation` | `boolean` | Offers the citizen the option to attach their position. They remain free to decline: this setting only opens the possibility |
+
+Left out, `canCall`, `canMessage` and `shareLocation` count as `true`, and `multiResponders`
+as `false`.
 
 {% hint style="warning" %}
 A business missing from `list` does not exist in the app. A player holding the matching job
@@ -86,8 +89,9 @@ filename in the `icon` field. Nothing to rebuild.
 
 - Square PNG, transparent background, 128 × 128 or 256 × 256 pixels.
 - The phone rounds the corners itself: do not round them in the image.
-- **A URL does not work.** The phone runs in an embedded browser with no network access at
-  all: an `https://` icon will never load, even though it displays fine in your own browser.
+- **A URL does not work.** The phone always looks for the file in its own `service_icons/`
+  folder: an `https://` address in this field becomes a broken path, even though it displays
+  fine in your own browser. The filename is cut at 64 characters.
 - **Do not put the file in `web/build/`.** That folder is rewritten on every phone update and
   your image would disappear.
 
@@ -162,8 +166,8 @@ type is dropped rather than allowed to break a callback three hours later.
    its icon and its live headcount.
 2. Connect a second player, give them the matching job, and flip the Duty switch on their
    "My service" page. The citizen's headcount goes from 0 to 1 without reopening the app.
-3. Send a request from the citizen. The employee gets a phone notification -
-   *"&lt;name&gt; needs your help."*: and the request appears in their queue.
+3. Send a request from the citizen. The employee gets a phone notification
+   (*"&lt;name&gt; needs your help."*) and the request appears in their queue.
 4. Take the request on the employee side. The citizen gets *"&lt;name&gt; is responding to your
    request."* and sees the state change in their own request list, which shows their five most
    recent requests.

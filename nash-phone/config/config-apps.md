@@ -1,6 +1,6 @@
 # config/apps.lua
 
-Which of the 32 applications exist on your server, what they are called, and where they start.
+Which of the 33 applications exist on your server, what they are called, and where they start.
 
 File: `config/apps.lua`
 
@@ -12,7 +12,7 @@ Each application accepts up to three keys, all optional.
 |---|---|---|---|
 | `enabled` | `boolean` | `true` | `false` makes the app **disappear**: no icon, absent from the App Store, the app library, search and Settings. It is also removed from the home screen of players who already had it |
 | `name` | `string` | the translated name | Display name shown instead of the original one |
-| `store` | `boolean` | per app, see below | `true` = not on the phone at first, the player downloads it from the App Store. `false` = pre-installed on the home screen from the first boot |
+| `store` | `boolean` | per app, see below | `true` = not on the phone at first, the player downloads it from the App Store (a pre-installed app moved there gets a generated App Store page). `false` = pre-installed on the home screen from the first boot |
 
 Anything you leave out keeps its original value. An application **absent from the table works
 normally**, so you can delete the lines you do not care about: including apps added by a later
@@ -78,6 +78,10 @@ Shipped with `store = true`. Set `store = false` to pre-install one on the home 
 | `snake` | Snake | `snapz` | Snapz |
 | `tictactoe` | Tic-Tac-Toe | `chatapp` | ChatApp |
 | | | `birdby` | BirdBy |
+| | | `cindr` | Cindr (dating, settings in [config/social.lua](config-social.md)) |
+
+Custom applications are not part of this table: they are declared in
+[config/custom_apps.lua](config-custom-apps.md).
 
 ## Examples
 

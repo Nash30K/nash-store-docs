@@ -7,14 +7,14 @@ Translate the whole phone into a language of your choice by dropping one JSON fi
 
 - Filesystem access to the `nash_phone` resource folder
 - A text editor that saves in **UTF-8**
-- Roughly a full day of work: a complete language is about **2,300 strings**
+- Roughly a full day of work: a complete language is about **2,750 strings**
 
 {% hint style="info" %}
 **Why the language files are JSON read at runtime.** You receive the interface already built
 (`web/build/`), without its sources. A language written inside the interface code could
 therefore only ever be added by us. Languages instead live in `locales/<code>.json` and are
-read from disk when the resource starts (`shared/uilocales.lua`), which is exactly what lets
-you add one without rebuilding anything.
+read from disk when the resource starts, which is exactly what lets you add one without
+rebuilding anything.
 {% endhint %}
 
 ## What is in a language file
@@ -31,8 +31,11 @@ Every file carries two blocks, and that is all there is to know:
 
 | Block | What it holds | Count |
 | ----- | ------------- | ----- |
-| `dict` | Everything displayed **on the phone screen** | ~2,300 strings |
-| `lua` | Messages displayed **outside the phone**: notifications, warnings, key-mapping labels | 44 strings |
+| `dict` | Everything displayed **on the phone screen** | ~2,750 strings |
+| `lua` | Messages displayed **outside the phone**: notifications, warnings, key-mapping labels | 83 strings |
+
+The file also starts with a `_lisezMoi` block: a short note in English for whoever opens it.
+It is not read by the phone, you can leave it or delete it.
 
 ## 1. Duplicate a shipped file
 
@@ -67,20 +70,21 @@ string to the screen that displays it.
 the phone inserts. Move them wherever your language requires, but keep them intact.
 
 ```json
-"weather.credit": "{city} Weather · Simulated data",
-"health.stepsGoal": "{n} steps out of {goal}"
+"weather.credit": "{city} Weather · Simulated Data",
+"health.goalSteps": "Goal {n} steps"
 ```
 
 **The `localeTag` keys are not sentences.** `en-US` is a code that drives the formatting of
 dates, times and numbers. Left as-is, your phone will display "3:45 PM" and "1,234.5" in the
 middle of an otherwise fully translated interface. Replace it with your own language's tag:
-`zh-CN`, `es-ES`, `pt-BR`. There are eleven of them:
+`zh-CN`, `es-ES`, `pt-BR`. There are twelve of them (the last one sets the date and number
+format in Photos):
 
 ```
 birdby.localeTag      calculator.localeTag   calendar.localeTag
 health.localeTag      messages.localeTag     notes.localeTag
 phone.localeTag       shell.lock.localeTag   snapz.localeTag
-stocks.localeTag      wallet.localeTag
+stocks.localeTag      wallet.localeTag       gallery.locale
 ```
 
 The file must stay in **UTF-8**. Every alphabet works.
@@ -95,9 +99,10 @@ written `%s` and `%.1f` instead of `{name}`. Keep them, in the same order.
 "missed_call": "来自 %s 的未接来电"
 ```
 
-The nine strings that carry placeholders:
+The ten strings that carry placeholders:
 
 ```
+dating_match_body  You and %s like each other. Your move.
 location_shared    📍 Location shared (%.1f, %.1f)
 message_from       Message from %s
 missed_call        Missed call from %s
@@ -120,9 +125,15 @@ Config.Locale = 'zh'
 
 Restart the resource.
 
-`Config.Locale` sets two things at once: the language of the notifications pushed outside the
-phone, and the starting language of a player who has never touched the setting. Each player
-keeps the final say through **Settings → General → Language**, and their choice is remembered.
+`Config.Locale` is the starting language of a player who has never touched the setting, and
+the fallback language for messages shown outside the phone. Each player keeps the final say
+through **Settings → General → Language**, and their choice is remembered: the messages the
+server sends to a player (notifications, toasts) follow that player's language when its file
+is loaded, and `Config.Locale` otherwise.
+
+`Config.Locale` is also the server's language: key binding names, a few camera and music
+alerts shown by the client, and the Discord / Fivemanage log texts always use it, whatever the
+player picks.
 
 ## 5. (Optional) Let players choose
 
@@ -137,18 +148,27 @@ Config.ExtraLocales = { 'zh', 'es' }
 French and English are always in that list. `Config.ExtraLocales` is only about *offering* a
 choice: to simply move the whole server to another language, `Config.Locale` is enough.
 
+The first-open setup has its own list of languages, `Config.Setup.languages` in
+`config/setup.lua` (`code` and `label`). To let new players pick your language on the setup
+screen, add it there too. That list already offers `de`, `nl`, `it`, `es`, `pt` and `ru`
+besides French and English; only those with a file in `locales/` actually translate the phone.
+Picking one of the others shows the rest of the setup in English, and the phone then keeps the
+language it had before.
+
 ## How to know it works
 
 At startup, the server prints one green line per loaded language:
 
 ```
-[nash_phone] Langue « zh » chargee : 2336 texte(s) d ecran, 44 message(s).
+[nash_phone] Langue « zh » chargee : 2758 texte(s) d ecran, 83 message(s).
 ```
 
 The two counts are the real number of keys read from your file. A count far below the shipped
 one means your file lost a block while you were editing it.
 
-If the language is missing, the console says so, in red:
+If a language set in `Config.Locale` or `Config.ExtraLocales` cannot be loaded, the console
+says so, in red (a language in neither setting is never loaded, so nothing is printed for it).
+If the `Config.Locale` file itself cannot be loaded, the phone starts in French:
 
 ```
 [nash_phone] locales/zh.json est introuvable. Langue « zh » ignoree.
@@ -195,8 +215,11 @@ spot the missing keys.
 
 ## What stays in its original language
 
-**Proper nouns**: your server's name, the city name, the application names. They are set
-elsewhere, in `config/main.lua` (`Config.Brand`) and `config/settings.lua` (`Config.City`).
+**Proper nouns**: your server's name and the city name. They are set elsewhere, in
+`config/main.lua` (`Config.Brand`) and `config/settings.lua` (`Config.City`).
+
+Application names are translated like any other string, in the `app.*` keys of `dict`. To force
+one name in every language, set `name` for that app in `config/apps.lua`.
 
 `Config.Brand.site.title` is the one branding value that is written **per language:** the key
 is the language code:
@@ -205,7 +228,7 @@ is the language code:
 -- config/main.lua
 Config.Brand = {
     name = 'NASH',
-    studio = 'Nash',
+    studio = 'Nash Store',
     site = {
         label = 'NASH Store',
         url = 'nash-store.com',
@@ -226,5 +249,7 @@ Use the usual ISO code: `es` Spanish, `de` German, `it` Italian, `pt` Portuguese
 Brazilian Portuguese, `nl` Dutch, `pl` Polish, `ru` Russian, `tr` Turkish, `ar` Arabic, `zh`
 Chinese, `ja` Japanese, `ko` Korean.
 
-The code has no special meaning to the phone: it only ties `Config.Locale` to the filename. It
-just has to be the same on both sides.
+The code has no special meaning to the phone: it only ties `Config.Locale` to the filename.
+Write both in **lowercase**, for example `pt-br` and `locales/pt-br.json`: the phone lowercases
+the code before looking for the file, so on a Linux server a file named `pt-BR.json` is not
+found.

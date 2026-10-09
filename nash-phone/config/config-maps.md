@@ -63,9 +63,8 @@ its building, within 25 metres.
 If the block is missing, or degenerate (`minX == maxX`, or `minY == maxY`), the phone falls
 back to the same values internally, so a deleted block does not produce a wrong map.
 
-With `Config.Debug = true` in [config/main.lua](config-main.md), `/phoneconfig` prints the
-computed width and height and says whether they respect the proportion of the tiles, and
-`/phonecheck` lists wrong bounds among the things preventing the phone from working properly.
+Nothing checks the proportion at startup. If you edited these values anyway, check the result
+in game: stand on a landmark, open Maps, and see whether your own position lands on it.
 
 ## Config.Map.Travel
 
@@ -123,6 +122,9 @@ Config.Map.Categories = {
 | `name` | Displayed name |
 | `category` | One of the `id` values declared in `Config.Map.Categories` |
 | `coords` | Position in the game, read with `/phonepos`. Accepts `vec3(x, y, z)`, `{ x = , y = }` or `{ x, y }` |
+
+A place without `id`, `name` or usable `coords` is skipped without a message. Starting
+**Directions** to a place in the Maps app sets the game's GPS waypoint on its `coords`.
 
 ### Optional fields
 
@@ -208,5 +210,5 @@ The block never carries a `subtitle`: without one the phone shows the category n
 translates itself, and the address already carries the street and the zone. Apostrophes in
 street names such as O'Neil Way are escaped, so the pasted block still loads.
 
-`/phonepos` does not require `Config.Debug`, unlike the `/phone*` test commands: it only prints
-to the console of the player who ran it and writes nothing.
+`/phonepos` is open to every player, and harmless: it only prints to the console of the player
+who ran it and writes nothing.

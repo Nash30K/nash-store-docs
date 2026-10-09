@@ -14,9 +14,10 @@ ensure nash_phone
 ```
 
 {% hint style="warning" %}
-Order matters. The model is registered as an archetype through `DLC_ITYP_REQUEST`; if
-`nash_phone` boots first, the model is not known yet and the phone silently falls back to
-`Config.Prop.fallback`.
+Order matters. The model is registered as an archetype through `DLC_ITYP_REQUEST`. When the
+phone is taken out, it waits up to 2.5 seconds for the model to load; if the model is not known,
+the phone falls back to `Config.Prop.fallback` and prints one line in the player's F8 console
+(see [Troubleshooting](#troubleshooting)).
 {% endhint %}
 
 ## What the prop resource contains
@@ -60,7 +61,7 @@ Everything is under `Config.Prop` in `config/main.lua`.
 | `rotation` | `vec3(0.0, 0.0, 0.0)` | Attachment rotation |
 | `skin.enabled` | `true` | Coloured shell following the player's setting |
 | `skin.txd` | `'custom_phone_prop'` | Texture dictionary inside the `.ytd` |
-| `skin.textures` | `body`, `light`, `back` | The three texture names carrying the colour |
+| `skin.textures` | `body = 'Warm_Terracotta'`, `light = 'Warm_Terracotta_light'`, `back = 'back_iphone'` | The three textures of the model that carry the colour. Only change them if the model is rebuilt |
 | `skin.colors` | 4 entries | One entry per colour offered in Settings |
 | `skin.default` | `'cosmic'` | Colour applied when the player has not chosen |
 
@@ -96,24 +97,18 @@ The swap applies to the pair (dictionary, texture), with no notion of entity, so
 players'. This is a deliberate trade-off: it avoids streaming one model per colour.
 {% endhint %}
 
-### Adding or renaming a colour
+### Changing a colour
 
-Three lists have to agree, and nothing warns you when they drift:
+The four colours are fixed: `deepblue`, `cosmic`, `silver` and `black`. The swatches shown
+in Settings are part of the compiled interface, and the server only accepts those four values,
+so you cannot add a colour or rename one. Keep the four identifiers of
+`Config.Prop.skin.colors` as they are.
 
-| Where | What it holds |
-|---|---|
-| `config/main.lua`, `Config.Prop.skin.colors` | The shell of the prop held in hand |
-| The compiled interface | The swatches shown in Settings |
-| `server/apps/settings.lua`, `frameColor` | The server-side whitelist (`deepblue`, `cosmic`, `silver`, `black`) |
+What you can change is the **shade** of each one: edit `body`, `light` and the `back` PNG of
+an existing entry. Nothing to rebuild, a restart of the resource is enough.
 
-The swatch list is baked into the compiled interface, so the four shipped colours are the four
-you can offer. What you can change without rebuilding anything is the **shade** of each one:
-edit `body`, `light` and the `back` PNG of an existing entry.
-
-If a colour is missing from `Config.Prop.skin.colors`, the swatch still exists in Settings and
-the on-screen chassis changes, but the prop in hand keeps the previous shell. If it is missing
-from the server whitelist, the callback answers `{ ok = false }`: the player clicks the
-swatch, nothing moves, and no message appears anywhere.
+If one of the four entries is missing from `Config.Prop.skin.colors`, the swatch still exists in
+Settings and the on-screen chassis changes, but the prop in hand keeps the previous shell.
 
 ### The pairing rule
 
@@ -126,7 +121,7 @@ dull.
 
 **Everyone holds a stock GTA phone.**
 
-The console prints this once per session:
+The player's F8 console prints this once per session:
 
 ```
 [nash_phone] modèle « custom_phone_prop » introuvable, repli sur « prop_npc_phone_02 ».
@@ -134,7 +129,10 @@ La ressource du prop est-elle démarrée AVANT nash_phone ?
 ```
 
 Check that `nash-phoneprop` is in `resources/`, started, and started before `nash_phone`.
-`/phonedeps` reports its state too.
+
+For a closer look, any player can type `/nashprop`. It prints in the F8 console the state of `nash-phoneprop`, whether the model loads and how long it took, the
+fallback model, the colour applied, and whether each `back` PNG of `Config.Prop.skin.colors`
+is found.
 
 **The phone is two-tone in hand.**
 

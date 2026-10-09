@@ -1,8 +1,9 @@
 # Server Exports
 
-54 exports are declared on the server, in `server/apps/exports.lua`. They are the entry point
-for any resource that needs to read a phone number, text a player, drop a notification on
-their lock screen, or write a line in their wallet history.
+60 exports are declared on the server. They are the entry point for any resource that needs
+to read a phone number, text a player, drop a notification on their lock screen, write a line
+in their wallet history, or drive the Services app. `SendCustomAppMessage`, the server half of
+the custom application API, is documented in [Custom Applications](custom-apps.md).
 
 All of them live in the `nash_phone` namespace and are called from a server script:
 
@@ -15,7 +16,7 @@ that is too long for its column is truncated instead of failing the insert, so a
 throws an SQL error inside your own resource. The exact limits are listed on each export.
 
 {% hint style="warning" %}
-19 of these names, plus 10 getters, are **neutral stubs**. They exist so a script written for
+19 of these names, plus 12 getters, are **neutral stubs**. They exist so a script written for
 another phone does not crash, they return a harmless value, and they change nothing. Each one
 is flagged below, and all of them are listed in [Neutral stubs](#neutral-stubs) at the end of
 the page.
@@ -54,6 +55,8 @@ local number = exports.nash_phone:GetEquippedPhoneNumber(source)
 - With a string, the value is treated as a framework identifier and the number is **created
   if the character does not have one yet**, which writes a row in `nash_phone_phones`. Use
   this form only for characters you know exist.
+- Pass a server id as a **number**. A server id passed as a string (`'12'`) is read as a
+  framework identifier, and a phone number is created for a character called `12`.
 - A number is never reassigned, so the result can safely be cached by your resource.
 
 **Example**
@@ -64,6 +67,38 @@ RegisterCommand('mynumber', function(source)
     print(('%s uses %s'):format(GetPlayerName(source), number or 'no phone'))
 end, false)
 ```
+
+</details>
+
+<details>
+
+<summary>GetPhoneNumber</summary>
+
+Returns the phone number of a connected player.
+
+**Signature**
+
+```lua
+local number = exports.nash_phone:GetPhoneNumber(source)
+```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `source` | `number` | Player server id |
+
+**Returns**
+
+| Name | Type | Description |
+|---|---|---|
+| `number` | `string?` | Phone number, or `nil` if the player has no loaded character |
+
+**Behavior**
+
+Same lookup as `GetEquippedPhoneNumber` with a server id: the in-memory directory first, then
+the database through the framework identifier, creating the number if the character has none.
+It has no identifier form: always pass a server id.
 
 </details>
 
@@ -157,7 +192,7 @@ working. It is not a validator: whatever you pass comes back, including `nil`.
 
 <summary>GetConfig</summary>
 
-Returns the phone configuration, minus the upload credentials.
+Returns the phone configuration, minus the blocks that hold secrets.
 
 **Signature**
 
@@ -169,12 +204,13 @@ local config = exports.nash_phone:GetConfig()
 
 | Name | Type | Description |
 |---|---|---|
-| `config` | `table` | Deep copy of the `Config` table, without the `Upload` key |
+| `config` | `table` | Deep copy of the `Config` table, without the `Upload`, `VideoTurn` and `Logs` keys |
 
 **Behavior**
 
-- `Config.Upload` holds the image-hosting API key of the server and is stripped out. Every
-  other section is present.
+- `Config.Upload` (image-hosting API key), `Config.VideoTurn` (TURN API token) and
+  `Config.Logs` (Discord webhook links and Fivemanage logs key) are stripped out. Every other
+  section is present.
 - The copy is deep, so writing into a sub-table does not alter the phone's real
   configuration.
 - The copy is built once and the **same instance is handed to every caller**. Treat it as
@@ -251,7 +287,7 @@ local settings = exports.nash_phone:GetSettings(number)
 | `hiddenNumber` | `false` | Caller id withheld on outgoing calls |
 | `frameColor` | `'cosmic'` | Shell colour, one of `deepblue`, `cosmic`, `silver`, `black` |
 | `ringtone` | `'reflection'` | Ringtone id |
-| `wallpaper` | `'photo-23'` | Wallpaper id |
+| `wallpaper` | `'photo-23'` | Wallpaper id: a built-in id, or `'img-<id>'` when the player uses one of their own photos (`<id>` is the `nash_phone_gallery` row id) |
 | `brightness` | `85` | Screen brightness |
 | `phoneScale` | `0.67` | On-screen size of the device |
 | `phonePos` | `'br'` | On-screen corner |
@@ -260,8 +296,15 @@ local settings = exports.nash_phone:GetSettings(number)
 
 **Behavior**
 
-- Keys prefixed with an underscore (`_profileName`, `_mutedThreads`, `_earbuds`) are internal
-  storage used by other parts of the phone. Do not write logic against them.
+- Keys prefixed with an underscore (for example `_profileName`, `_mutedThreads`, `_earbuds`)
+  are internal storage used by other parts of the phone. Do not write logic against them.
+- When `wallpaper` is `'img-<id>'`, `_wallpaperPhoto` holds `{ id, url, x, y, zoom }`: the
+  address saved when the photo was chosen (kept even if the photo is later deleted from
+  Photos), the focal point `x` and `y` from 0 to 1, and `zoom` from 1 to 4. It is written only
+  by the server, from the player's own camera roll. A player who picks a built-in wallpaper
+  keeps it, so it can be present while `wallpaper` is a built-in id.
+- Treat the table as read-only: nested tables such as `notifications` can be shared with the
+  phone's own defaults, so writing into them changes what the next call returns.
 - The table also contains `passcode`, the player's lock code in clear. Never forward the
   result of this export to a client.
 - A player who has never changed a setting still gets a full table: the defaults are merged
@@ -334,9 +377,9 @@ exports.nash_phone:SendNotification(target, appId, title, text, icon)
 
 | Name | Type | Description |
 |---|---|---|
-| `target` | `number` \| `string` | Player server id, or a phone number |
+| `target` | `number` | Player server id. Use the table form to address a player by phone number |
 | `appId` | `string` | Application id |
-| `title` | `string` | Required in this form: a call with no title returns `nil` and sends nothing |
+| `title` | `string` | Required in this form: a call with no title sends nothing |
 | `text` | `string?` | Body |
 | `icon` | `string?` | Icon URL |
 
@@ -344,7 +387,7 @@ exports.nash_phone:SendNotification(target, appId, title, text, icon)
 
 | Name | Type | Description |
 |---|---|---|
-| `ok` | `boolean?` | `true` when the notification was pushed, `nil` when the target could not be resolved or the flat form was missing its title |
+| `ok` | `boolean?` | `true` when the notification was pushed. A falsy value (`nil` or `false`) when the target could not be resolved, or when the flat form was missing its target or its title |
 
 **Behavior**
 
@@ -497,7 +540,8 @@ Nothing. The write is synchronous but silent.
 
 - Nothing happens if the owner number is unknown or `data.number` is missing.
 - The pair (owner, number) is unique in `nash_phone_contacts`: adding a contact that already
-  exists **updates** the name and the avatar instead of failing.
+  exists **updates** the name and the avatar instead of failing. An avatar you leave out
+  clears the one the contact had.
 - The Contacts application loads its list when it opens, so a contact added while the app is
   already on screen appears the next time the player opens it.
 
@@ -512,6 +556,39 @@ RegisterNetEvent('my_job:hire', function()
     exports.nash_phone:AddContact(number, { number = shopNumber, name = 'Dispatch' })
 end)
 ```
+
+</details>
+
+<details>
+
+<summary>ForgetContactNames</summary>
+
+Clears the server's cache of contact names for one character.
+
+**Signature**
+
+```lua
+local ok = exports.nash_phone:ForgetContactNames(ownerOrNumber)
+```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `ownerOrNumber` | `string` | The character's phone number, or its framework identifier |
+
+**Returns**
+
+| Name | Type | Description |
+|---|---|---|
+| `ok` | `boolean` | `false` when the argument is not a non-empty string, `true` otherwise |
+
+**Behavior**
+
+- The server keeps the names of each character's contacts in memory, to label incoming SMS,
+  calls and notifications. Entries are dropped after 15 minutes on their own.
+- Call this after your resource has written into `nash_phone_contacts` directly, so the next
+  SMS or call shows the new name at once. `AddContact` already does it for you.
 
 </details>
 
@@ -559,8 +636,8 @@ local payload = exports.nash_phone:SendMessage(from, to, message, attachments, c
 This export bypasses two things the in-app SMS path honours: the recipient's **airplane
 mode**, and their **muted conversations**. A message sent through this export is delivered
 and notified in both cases. Check `HasAirplaneMode` first if you want a realistic behaviour.
-Note as well that the banner shows the raw sender number, not the contact name, because the
-sender is not necessarily a person.
+The banner and the thread show the sender under the name the recipient saved for that number,
+or as the raw number when it is not in their contacts.
 {% endhint %}
 
 **Example, a shop line that answers**
@@ -612,7 +689,8 @@ local payload = exports.nash_phone:SendCoords(from, to, coords)
 **Behavior**
 
 - The body is built from the `location_shared` locale string, in the **server** language
-  (`Config.Locale`), not in the recipient's. It reads `Location shared (x, y)` in English.
+  (`Config.Locale`), not in the recipient's. It reads `📍 Location shared (x, y)` in English,
+  with one decimal per coordinate.
 - The message is a plain text message. The phone does not turn it into a map pin.
 - Nothing is sent when `from` or `to` is missing.
 
@@ -737,15 +815,16 @@ local call = exports.nash_phone:GetCall(callId)
 
 | Name | Type | Description |
 |---|---|---|
-| `call` | `table?` | The call record, or `nil` if that id is unknown |
+| `call` | `table?` | The call record, or `nil` if that id is unknown or the call has ended |
 
 **Call fields**
 
 | Field | Type | Description |
 |---|---|---|
-| `id` | `number` | Call id |
+| `id` | `string` | Call id, in the form `call_<n>` |
 | `channel` | `number` | Voice channel used by the call |
 | `callerSrc` / `calleeSrc` | `number` | Server ids of both sides |
+| `callerId` / `calleeId` | `string` | Framework identifiers of both sides |
 | `callerNumber` / `calleeNumber` | `string` | Numbers of both sides |
 | `callerName` / `calleeName` | `string?` | How each side is displayed to the other |
 | `answeredAt` | `number?` | Timestamp of the answer, `nil` while ringing |
@@ -754,6 +833,10 @@ local call = exports.nash_phone:GetCall(callId)
 | `guests` | `table` | Conference participants |
 | `speakers` / `listeners` | `table` | Speakerphone bookkeeping |
 | `_done` | `boolean` | `true` once the call is over |
+
+A call is removed from memory as soon as it ends, so `GetCall` returns `nil` for it. No public
+event hands out call ids: to ask "is this player on the phone" or to hang them up, use
+`IsInCall` and `EndCall` below, which take a server id.
 
 {% hint style="warning" %}
 This returns the **live internal table**, not a copy. Writing into it corrupts a call in
@@ -821,6 +904,8 @@ local ended = exports.nash_phone:EndCall(source)
 **Behavior**
 
 - The other side is notified and the voice channel is released for everyone involved.
+- A player who joined a conference as a guest only leaves it: the call goes on for the others
+  as long as at least two people are still in it.
 - This is the export to pair with the client `ToggleDisabled`: confiscating a phone kicks the
   player out of the voice channel, but the call itself stays open server-side until it is
   ended here.
@@ -882,9 +967,115 @@ local address = exports.nash_phone:GetEmailAddress(source)
 **Behavior**
 
 - The address belongs to the character and is created the first time that character opens the
-  Mail application.
-- `nil` therefore means "this player has never opened Mail", which is a real answer and not a
-  placeholder. If your script needs an address to exist, ask the player to open the app once.
+  Mail application, or when the first-run setup is shown to them.
+- `nil` therefore means "this character has never opened Mail nor seen the setup", which is a
+  real answer and not a placeholder. If your script needs an address to exist, ask the player
+  to open the app once.
+- Only connected players resolve: the lookup goes through the framework identifier of that
+  server id.
+
+</details>
+
+## Services
+
+The Services app lets citizens reach the jobs listed in `Config.Services.list`
+(`config/services.lua`). These two exports let a duty or clock-in script drive it.
+
+<details>
+
+<summary>SetServiceDuty</summary>
+
+Puts a player on or off duty in the Services app.
+
+**Signature**
+
+```lua
+local ok = exports.nash_phone:SetServiceDuty(source, on, receive)
+```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `source` | `number` | Player server id |
+| `on` | `boolean` | `true` puts the player on duty, anything else takes them off |
+| `receive` | `boolean?` | Whether they get new requests. Left out, the previous value is kept (`true` the first time) |
+
+**Returns**
+
+| Name | Type | Description |
+|---|---|---|
+| `ok` | `boolean` | `false` when `source` cannot be read as a number, or when the player's current framework job is not listed in `Config.Services.list` |
+
+**Behavior**
+
+- The job is read from the framework at the moment of the call: the player is put on duty for
+  the job they hold now.
+- The state lives in memory and is cleared when the player disconnects or unloads their
+  character.
+- This works whatever `Config.Services.ownDuty` says. With `ownDuty = false` the app hides its
+  own Duty switch and this export is the only way to put anyone on duty.
+
+</details>
+
+<details>
+
+<summary>GetServiceOnDuty</summary>
+
+Counts the players a service can reach right now.
+
+**Signature**
+
+```lua
+local count = exports.nash_phone:GetServiceOnDuty(job)
+```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `job` | `string` | Framework job name, as written in `Config.Services.list` |
+
+**Returns**
+
+| Name | Type | Description |
+|---|---|---|
+| `count` | `number` | Players of that job who are on duty **and** accept requests. `0` when `job` is not a string |
+
+</details>
+
+## First-run setup
+
+<details>
+
+<summary>ResetPhoneSetup</summary>
+
+Makes a character go through the first-run setup again.
+
+**Signature**
+
+```lua
+local ok = exports.nash_phone:ResetPhoneSetup(source)
+```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `source` | `number` \| `string` | Player server id, or a framework identifier passed as a string |
+
+**Returns**
+
+| Name | Type | Description |
+|---|---|---|
+| `ok` | `boolean` | `false` when no identifier could be resolved, `true` otherwise |
+
+**Behavior**
+
+- The setup row of the character is deleted, so the setup screens come back at the next
+  opening of the phone (only while `Config.Setup.enabled` is `true`).
+- The settings already chosen (language, appearance, lock code) are not reset by this call.
+- The server event `nash-phone:setupCompleted` fires again once the player finishes.
 
 </details>
 

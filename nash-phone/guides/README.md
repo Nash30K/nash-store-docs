@@ -28,7 +28,7 @@ worked.
 - [Add a third-party application](add-custom-app.md): ship your own app from your own
   resource, or port one written for another phone.
 - [Video calls and InstaPic live streams](setup-video-calls.md): what travels through your
-  server, what travels player to player, and when you need a TURN server.
+  server, what travels player to player, and how to set up the TURN relay.
 
 ## Related
 

@@ -1,8 +1,8 @@
 # ESX
 
-ESX is the reference platform for NASH Phone. It is the framework listed in the resource's
-required dependencies, and the two SQL helpers shipped in `sql/` target the default ESX
-`items` table.
+ESX is the reference platform for NASH Phone: the two SQL helpers shipped in `sql/` target the
+default ESX `items` table. Like the other frameworks, it is not a hard dependency of the
+resource: it is detected at boot.
 
 ## Detection
 
@@ -75,11 +75,11 @@ Both spellings are tried, because both exist depending on the ESX version: the `
 on ESX Legacy, the `getGroup()` method on older builds. `getGroup` is called **without**
 `self`, since ESX attaches it as a closure on the player table rather than as a method.
 
-The bridge returns `nil`, never `'user'`, when the framework does not know the player yet -
-confusing "not loaded" with "plain player" would reject an admin who has just connected.
+The bridge returns `nil`, never `'user'`, when the framework does not know the player yet:
+"not loaded" is not "plain player".
 
-Groups are used by `Config.DebugGroups` (default `{ 'admin', 'superadmin' }`) to gate the
-`/phone*` test commands.
+No feature of the phone reads the group at the moment: `group` is part of the bridge interface
+only.
 
 ## Money
 
@@ -120,8 +120,9 @@ The resource creates **no** item. With `Config.UseItem = true` (the default), th
 in `Config.ItemName` (default `'phone'`) must exist in your inventory **and** be in the
 player's pockets.
 
-For the default ESX inventory: the one that reads its items from the `items` table: import
-`sql/item_phone.sql`, or run:
+For the default ESX inventory (the one that reads its items from the `items` table), import
+`sql/item_phone.sql` (its label ships in French, `Téléphone`: change it first on a server in
+another language), or run:
 
 ```sql
 INSERT INTO `items` (`name`, `label`, `weight`) VALUES ('phone', 'Phone', 1)
@@ -163,10 +164,11 @@ matching nothing.
 
 ## Pitfalls
 
-- **The item gate has no back door.** `/phone` and the open key both go through the same
-  server check (`server/main.lua`, `requestOpen`). If the item does not exist, nobody opens
-  the phone: not even an admin. Fifteen seconds after start the console prints a red block
-  saying exactly that. Either create the item or set `Config.UseItem = false`.
+- **The item gate has no back door.** `/phone`, the open key and the `ToggleOpen` / `OpenApp`
+  client exports all go through the same server check (the `nash_phone:requestOpen` event, or
+  the `nash_phone:canOpen` callback for the exports). If the item does not exist, nobody opens
+  the phone: not even an admin. Fifteen seconds after the framework is detected the console
+  prints a red block saying exactly that. Either create the item or set `Config.UseItem = false`.
 - **`xPlayer.get(...)` returns nothing on very old forks.** The name chain falls through to
   `xPlayer.name` and finally to `nil`, and the caller substitutes its own translated fallback.
 - **Money accounts are named `bank` and `money`.** ESX's cash account is `money`, not `cash`.
@@ -180,8 +182,8 @@ matching nothing.
 ## Checklist
 
 1. `[nash_phone] framework détecté : esx.` appears in the console at start.
-2. `/phonedeps` reports `es_extended` as the framework in use, and the expected inventory.
-3. `/phonedeps` reports the phone item as declared.
+2. The `inventaire détecté : ...` line names the expected inventory.
+3. No red `DOES NOT EXIST` block about the phone item appears in the 15 seconds that follow.
 4. The phone opens with the item in the player's pocket, and refuses without it.
 5. Settings shows the character's real RP name, not the translated "Unknown".
 6. The Bank app shows the same balance as the framework, and a transfer between two connected

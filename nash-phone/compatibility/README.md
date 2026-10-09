@@ -22,16 +22,15 @@ console announces what was picked at startup.
 ## Mostly server-side
 
 Almost everything framework-related is in `server/bridge/`. The client knows the framework in
-two places only, both of them listening to events and calling nothing:
+two places only:
 
-| File | What it listens to | Why |
-| ---- | ------------------ | --- |
-| `client/bridge/framework.lua` | `QBCore:Player:SetPlayerData`, `qbx_core:client:onSetMetaData`, `QBCore:Client:OnPlayerLoaded` / `OnPlayerUnload` | The `isdead` and `inlaststand` metadata of QBCore and QBOX, see [Death](#death-closes-the-phone) |
-| `client/main.lua` | `esx:onPlayerLogout`, `QBCore:Client:OnPlayerUnload` | Closes the phone when a player goes back to character selection |
+| What | Events | Why |
+| ---- | ------ | --- |
+| Death state | `QBCore:Player:SetPlayerData`, `qbx_core:client:onSetMetaData`, `QBCore:Client:OnPlayerLoaded` / `OnPlayerUnload`, plus one read of the player data from `qbx_core` or `qb-core` when the player loads | The `isdead` and `inlaststand` metadata of QBCore and QBOX, see [Death](#death-closes-the-phone) |
+| Character switch | `esx:onPlayerLogout`, `QBCore:Client:OnPlayerUnload` | Closes the phone when a player goes back to character selection |
 
-`client/bridge/nui.lua` is the NUI router, not a framework bridge. A custom framework still
-never requires a client-side change: on a framework those events do not exist, they simply
-never fire.
+A custom framework never requires a client-side change: on a framework where those events do not
+exist, they simply never fire.
 
 ## Files
 
@@ -43,7 +42,11 @@ never fire.
 | `server/bridge/qbcore.lua` | QBCore provider |
 | `server/bridge/qbox.lua` | QBOX provider |
 | `server/bridge/inventory.lua` | The `Inventory.*` interface and its four built-in providers |
-| `server/bridge/custom.lua` | The only file meant to be edited: custom framework **and** custom inventory |
+| `server/bridge/custom.lua` | The only bridge file meant to be edited: custom framework **and** custom inventory |
+
+The resource is protected by Asset Escrow: `server/bridge/custom.lua` is the only bridge file
+that stays readable and editable (along with `config/*.lua`). The other `server/bridge/` files
+of the table are encrypted, and listed here only so the console messages make sense.
 
 `fxmanifest.lua` loads `server/bridge/**.lua` **before** `server/main.lua`, because
 `server/main.lua` subscribes to player loading as soon as it is loaded.
@@ -200,9 +203,9 @@ also reads their `isdead` and `inlaststand` metadata: a player on the ground, ev
 stand, cannot use the phone.
 
 {% hint style="warning" %}
-ESX is the reference platform: it is the framework named in the resource's own required-
-dependency list, and the two SQL helpers shipped in `sql/` (`item_phone.sql`,
-`item_earbuds.sql`) target the default ESX `items` table. The QBCore and QBOX bridges are
+ESX is the reference platform: the two SQL helpers shipped in `sql/` (`item_phone.sql`,
+`item_earbuds.sql`) target the default ESX `items` table. No framework is listed in the
+resource's hard dependencies (only OneSync, `ox_lib` and `oxmysql` are). The QBCore and QBOX bridges are
 complete and use only documented core APIs, but we do not claim production hours on them.
 On a QBCore or QBOX server, run the checklist at the bottom of
 [QBCore](qbcore.md) / [QBOX](qbox.md) before opening.
@@ -224,14 +227,17 @@ a migration for it.
 
 ## Diagnostics
 
-Two dev commands report what the bridges resolved to. They require `Config.Debug = true` in
-`config/main.lua`, plus a framework group listed in `Config.DebugGroups` (default
-`{ 'admin', 'superadmin' }`) or the `nash_phone.debug` ACE. The server console always passes.
+The server console tells you what the bridges resolved to. Read it after a restart:
 
-| Command | What it shows |
-| ------- | ------------- |
-| `/phonedeps` | The framework and inventory actually in use, and what stops working without each dependency |
-| `/phonecheck` | Short verdict: including "the phone item does not exist, nobody can open the phone" |
+| What to look for | Meaning |
+| ---------------- | ------- |
+| `framework détecté : ...` or `framework : ... (imposé par la configuration).` | The framework bridge in use |
+| `inventaire détecté : ...`, `inventaire : ... (imposé par la configuration).` or `inventaire : pont personnalisé.` | The inventory bridge in use |
+| A red block starting with `Config.UseItem = true but the item "phone" DOES NOT EXIST` | The inventory in place says `Config.ItemName` is not declared: nobody can open the phone |
+
+The red block names your own `Config.ItemName` (`phone` by default). It is printed about 15
+seconds after the framework is found, and only with `Config.UseItem = true`. When the inventory
+cannot answer (`itemExists` returns `nil`), nothing is printed.
 
 ## Going further
 

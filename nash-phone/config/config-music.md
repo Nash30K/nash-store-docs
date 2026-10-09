@@ -6,9 +6,9 @@ File: `config/music.lua`, loaded as a shared script.
 
 ## Read this before filling the file
 
-The phone **cannot play an audio file on its own**. Its interface runs inside FiveM's CEF,
-which has no network access. Sound therefore goes through `xsound`, as **proximity audio**: the
-players around you hear what you are listening to, like a real phone speaker.
+The phone does **not play the audio inside its own interface**. Sound goes through `xsound`, as
+**proximity audio**: the players around you hear what you are listening to, like a real phone
+speaker (or only the player, with earbuds).
 
 Three direct consequences:
 
@@ -16,8 +16,9 @@ Three direct consequences:
   play anything. The rest of the phone is unaffected.
 - Every track needs an **address that xsound can read**: a direct link to an audio file, or a
   YouTube link depending on your version of xsound.
-- A track **without an address is not displayed**, and neither is a track whose address does
-  not start with `http://` or `https://`, or is longer than 512 characters. The goal is that a
+- A track **without an address is not displayed**, and neither is a track without a numeric
+  `id`, or whose address does not start with `http://` or `https://` followed by a host name, or
+  is longer than 512 characters. The goal is that a
   player can never tap a track that will not play. A track missing from the app is almost
   always a track whose address was mistyped.
 
@@ -33,8 +34,8 @@ app's search bar accepts an address.
 ```lua
 Config.Music = {
     tracks = {
-        { id = 1, title = 'Nuit blanche', artist = 'Kessler', album = 'Néon',
-          duration = 213, url = 'https://example.com/music/nuit-blanche.mp3',
+        { id = 1, title = 'Sleepless Night', artist = 'Kessler', album = 'Neon',
+          duration = 213, url = 'https://example.com/music/sleepless-night.mp3',
           grad = { '#ff375f', '#ff8a5c' } },
     },
     playlists = {},
@@ -43,7 +44,7 @@ Config.Music = {
 
 | Field | Required | Description |
 | ----- | -------- | ----------- |
-| `id` | **Yes** | Unique and **stable**. This is what gets stored in players' favourites: renumbering it moves everyone's favourites |
+| `id` | **Yes** | A number, unique and **stable**. This is what gets stored in players' favourites: renumbering it moves everyone's favourites |
 | `url` | **Yes** | `http://` or `https://`, 512 characters maximum |
 | `title` | No | Trimmed to 80 characters |
 | `artist` | No | Trimmed to 80 characters |
@@ -60,7 +61,7 @@ Home-screen playlists. `tracks` holds `id` values from the list above.
 
 ```lua
 playlists = {
-    { name = 'Nuit', tracks = { 1, 3, 5 }, grad = { '#5e5ce6', '#ad6bff' } },
+    { name = 'Night', tracks = { 1, 3, 5 }, grad = { '#5e5ce6', '#ad6bff' } },
 },
 ```
 
@@ -78,43 +79,21 @@ empty.
 The library is cleaned once and cached at startup, so **restart the resource** after editing
 this file.
 
-`/phoneconfig` (with `Config.Debug = true` in [config/main.lua](config-main.md)) prints the
-count of playable tracks next to the count of declared ones, which answers the question
-directly:
+A dropped track leaves no line in the console. Count the tracks in the Music app against the
+entries of the file, then check each missing one against the rules above:
 
-```
-Musique: 12 titres jouables sur 15 declares, 2 listes de lecture
-  -> 3 titre(s) ecarte(s) : adresse absente, non http(s), ou id en double.
-```
+- `id` is a number, and no earlier entry uses the same one.
+- `url` is filled in, starts with `http://` or `https://` followed by a host name, and is 512
+  characters at most.
+
+A playlist missing from the app has an empty `name`, or none of its `tracks` match a track that
+survived.
 
 ## Playback settings
 
 Proximity range, default and maximum volume, and whether music stops when the player dies are
-declared as `Config.Music` in [config/main.lua](config-main.md).
-
-{% hint style="warning" %}
-`config/music.lua` **replaces** `Config.Music` instead of extending it. It is loaded after
-`config/main.lua`, so the audio settings written there (`distance`, `defaultVolume`,
-`maxVolume`, `stopOnDeath`) are dropped and the server falls back to its built-in values: 12
-metres, a starting volume of `0.4`, a ceiling of `1.0`, and music stopped on death.
-
-This is invisible in game except that the listening range is no longer the one you set. To
-actually change them, add the keys inside the `Config.Music` table of `config/music.lua`, which
-is the one that wins:
-
-```lua
-Config.Music = {
-    distance = 12.0,
-    defaultVolume = 0.4,
-    maxVolume = 1.0,
-    stopOnDeath = true,
-    tracks = { },
-    playlists = { },
-}
-```
-
-`/phoneconfig` and `/phonecheck` report the case explicitly when it applies.
-{% endhint %}
+declared as `Config.Music` in [config/main.lua](config-main.md). `config/music.lua` adds `tracks`
+and `playlists` to that same table, so both files are read.
 
 ## Private listening
 

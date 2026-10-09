@@ -11,8 +11,8 @@ never moves one.
 
 | Question | Interface | Used for |
 | -------- | --------- | -------- |
-| Does this player carry this item? | `Inventory.hasItem(src, item)` | Opening the phone (`Config.UseItem`), pairing the earbuds (`Config.Earbuds.requireItem`) |
-| Is this item **declared** on the server? | `Inventory.itemExists(name)` | The startup warning, and `/phonedeps` |
+| Does this player carry this item? | `Inventory.hasItem(src, item)` | Opening the phone (`Config.UseItem`), keeping music in the earbuds (`Config.Earbuds.requireItem`) |
+| Is this item **declared** on the server? | `Inventory.itemExists(name)` | The startup warnings about a missing phone or earbuds item |
 | What is the serial of the device this player carries? | `Inventory.serial(src, item)` | Recognising a **new phone**, which asks for the first-run setup again, and **Face ID**, which recognises one character per phone |
 | Does this player still carry the device with this serial? | `Inventory.porteSerial(src, item, serial)` | The same, asked in the safer direction |
 
@@ -104,13 +104,13 @@ hasItem = function(src, item)
 end,
 ```
 
-`true`, a number greater than zero and the string `'1'` all count; anything else means "does
-not have it". The call is wrapped in a `pcall`, so an error inside your function is read as
+`true`, or a number greater than zero (a numeric string such as `'1'` counts too); anything
+else means "does not have it". The call is wrapped in a `pcall`, so an error inside your function is read as
 "does not have it" rather than crashing the callback: which also means a broken implementation
 looks exactly like an empty pocket. Check the console.
 
-Called from four places: opening the phone, the `HasPhoneItem` export, pairing the earbuds, and
-a test command.
+Called from three places: opening the phone, the server `HasPhoneItem` export, and the earbuds
+check (`requireItem`).
 
 </details>
 
@@ -141,8 +141,8 @@ for a problem that does not exist. `nil` is a valid, deliberate answer, and the 
 returns exactly that.
 {% endhint %}
 
-This function has no effect on gameplay: it only drives the startup diagnostic and the
-`/phonedeps` line.
+This function has no effect on gameplay: it only drives the startup warnings, printed about 15
+seconds after the framework is found, for the phone item and the earbuds item.
 
 </details>
 
@@ -252,8 +252,16 @@ a real handset.
 - With `Config.UseItem = false` there is no item, therefore no device to recognise, and the
   setup never replays.
 
-`/phonesetup` prints the recorded serial next to the one currently in hand, which is the fastest
-way to tell "different handset" from "setup was never saved".
+The recorded serial is the `device` column of the character's row in `nash_phone_setup`.
+Comparing it with the serial stored in the item tells "different handset" from "setup was never
+saved":
+
+```sql
+SELECT `done`, `device` FROM `nash_phone_setup` WHERE `owner` = 'char1:abc123';
+```
+
+Replace `char1:abc123` with the identifier your bridge returns for that character. An empty
+`device` means no serial was ever read for this character.
 
 A resource that wants to know fires on `nash-phone:deviceChanged`: see
 [Server Events](../developer-api/server-events.md).
@@ -265,14 +273,15 @@ The resource creates no item. Two names come from the config:
 | Config key | Default | Required? |
 | ---------- | ------- | --------- |
 | `Config.ItemName` | `'phone'` | Yes, when `Config.UseItem = true` (the shipped default) |
-| `Config.Earbuds.itemName` | `'phone_earbuds'` | Only when `Config.Earbuds.enabled = true` and `requireItem = true` (both shipped defaults) |
+| `Config.Earbuds.itemName` | `'phone_earbuds'` | Whenever `Config.Earbuds.enabled = true` (the shipped default): using the item is the only way to pair the earbuds. `requireItem` only decides whether it must stay in the pockets afterwards |
 
 {% hint style="danger" %}
-**The phone item gate has no back door.** `/phone` and the open key both go through the same
-server check (`server/main.lua`, `requestOpen`). If the item does not exist in your inventory,
-nobody opens the phone: not even an admin, not from the console. Fifteen seconds after start
-(to let the inventory finish loading its items), the console prints a red block saying exactly
-that, and `/phonecheck` reports it as blocking.
+**The phone item gate has no back door.** `/phone` and the open key go through the server
+check of the `nash_phone:requestOpen` event, and the `ToggleOpen` / `OpenApp` client exports
+through the same check behind the `nash_phone:canOpen` callback. If the item does not exist in
+your inventory, nobody opens the phone: not even an admin, not from the console. Fifteen seconds
+after the framework is detected (to let the inventory finish loading its items), the console
+prints a red block saying exactly that.
 
 Two ways out: declare the item, or set `Config.UseItem = false` to open the phone without
 carrying anything.
@@ -300,20 +309,21 @@ Where to declare them depends on your inventory:
 - **`Config.Inventory = 'framework'` on QBOX.** QBOX has no native inventory, and its bridge
   returns `nil` for both native-inventory functions on purpose. Item ownership then always
   answers `false`.
-- **Returning something that is neither a boolean nor a count.** `hasItem` accepts `true`, a
-  number greater than zero, and the string `'1'`, which covers every sane way of writing one.
+- **Returning something that is neither a boolean nor a count.** `hasItem` accepts `true` and
+  a number (or numeric string) greater than zero, which covers every sane way of writing one.
   It does **not** accept a table or an arbitrary string: Lua would call those true, and a
   malformed return would pass for ownership.
 - **Deriving the serial from the player instead of the item.** Recognition then never fires: a
   new handset carries the same value as the old one.
-- **Editing `server/bridge/custom.lua` and losing it on update.** It is the one file in the
-  resource meant to be edited. Keep a copy before replacing the folder.
+- **Editing `server/bridge/custom.lua` and losing it on update.** It is the one bridge file
+  meant to be edited, and replacing the resource folder replaces it. Keep a copy before an
+  update.
 
 ## Checklist
 
 1. `[nash_phone] inventaire : pont personnalisé.` appears at start: or
    `inventaire détecté : ox.` if you meant to stay on auto.
-2. `/phonedeps` reports the inventory in use and the phone item as declared.
+2. No red `DOES NOT EXIST` block about the phone item appears in the 15 seconds that follow.
 3. A player carrying the item opens the phone with `/phone`, the open key, and by using the
    item.
 4. A player **without** the item is refused on all three paths.
@@ -323,9 +333,10 @@ Where to declare them depends on your inventory:
    and disconnects them, and the item is never consumed.
 7. Temporarily setting `Config.ItemName` to a name that does not exist produces the red startup
    block. That proves `itemExists` is answering, not returning `nil` by accident.
-8. Only if you implemented `serial`: `/phonesetup` shows the same value on both lines, opening
-   and closing the phone several times never changes it, and storing the phone in a trunk and
-   taking it back does not change it either.
+8. Only if you implemented `serial`: the `device` column of the character's row in
+   `nash_phone_setup` holds the serial stored in the item, opening and closing the phone several
+   times never changes it, and storing the phone in a trunk and taking it back does not change
+   it either.
 9. Only if you implemented `serial`: destroying the phone item, receiving a fresh one and
    opening it runs the first-run setup again, and the byCloud account reopens with its
    password. The player's texts and contacts are still there afterwards.

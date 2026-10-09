@@ -34,12 +34,15 @@ Framework and inventory are chosen **separately**, in `config/bridge.lua`. Both 
 
 | `Config.Framework` | `Config.Inventory` |
 |---|---|
-| `auto`, `esx`, `qbcore`, `qbox`, `custom` | `auto`, `ox`, `qb`, `framework`, `custom` |
+| `auto`, `esx`, `qbcore`, `qbox`, `custom` | `auto`, `ox`, `qs`, `qb`, `framework`, `custom` |
+
+`qs` is qs-inventory; `qb` covers qb-inventory and its ps-inventory and lj-inventory forks.
 
 In `auto`, frameworks are probed in the order **QBOX → QBCore → ESX**. QBOX is tried first on
 purpose: many QBOX servers run a `qb-core` compatibility resource alongside, and probing
-QBCore first would file them under the wrong bridge. Inventories probe `ox_inventory` first,
-because when it runs it owns the item list whatever framework is underneath.
+QBCore first would file them under the wrong bridge. Inventories are probed in the order
+**ox_inventory → qs-inventory → qb-inventory → the framework's own**: `ox_inventory` comes
+first because when it runs it owns the item list whatever framework is underneath.
 
 The console tells you what was retained:
 
@@ -57,8 +60,8 @@ A custom framework or inventory is written in `server/bridge/custom.lua`: see
 
 <summary>Do I have to import the SQL file?</summary>
 
-No. `server/db/schema.lua` creates the 27 tables at boot and adds new columns and indexes on
-later updates without any action from you. `sql/nash_phone.sql` ships the same schema for
+No. The resource creates its 31 tables at boot and adds new columns and indexes on later
+updates without any action from you. `sql/nash_phone.sql` ships the same schema for
 owners who prefer to prepare the database by hand, but it is not needed.
 
 The two files you *may* need are `sql/item_phone.sql` and `sql/item_earbuds.sql`, and only if
@@ -92,10 +95,10 @@ with nothing in their pockets.
 
 {% hint style="warning" %}
 The resource creates **no item**. If `Config.UseItem` is true and the item does not exist in
-your inventory, nobody opens the phone: not even an admin. The `/phone` command and the key
-both go through the same server-side check (`nash_phone:requestOpen` in `server/main.lua`),
-so there is no way around it. The server prints a red block in the console at startup when it
-detects this case.
+your inventory, nobody opens the phone: not even an admin. The `/phone` command, the key and
+the `ToggleOpen` / `OpenApp` client exports all go through the same server-side check, so there
+is no way around it. The server prints a red block in the console 15 seconds after startup when
+it detects this case.
 {% endhint %}
 
 </details>
@@ -115,8 +118,8 @@ The key is registered with `RegisterKeyMapping`, so each player can also rebind 
 FiveM keybinding settings without you changing anything. Changing `Config.OpenKey` only moves
 the **default**; a player who already rebound it keeps their own choice.
 
-Two more mappings exist and belong to the camera, not the phone: `RETURN` takes a picture and
-left `Alt` toggles the aiming cursor (`client/apps/camera_control.lua`).
+Two more mappings exist and belong to the camera, not the phone: `RETURN` (Enter) takes a
+picture and left `Alt` toggles the aiming cursor. Players can rebind them the same way.
 
 </details>
 
@@ -124,13 +127,12 @@ left `Alt` toggles the aiming cursor (`client/apps/camera_control.lua`).
 
 <summary>Can players walk and drive while the phone is open?</summary>
 
-Yes. Opening the phone calls `SetNuiFocus(true, true)` together with
-`SetNuiFocusKeepInput(true)`, then a control-disable loop turns off combat, jump, cover, the
-weapon wheel, entering and leaving vehicles, and free camera look: but leaves movement alone.
+Yes. The phone keeps the game's input while it is open, and only turns off combat, jump,
+cover, the weapon wheel, entering and leaving vehicles, and free camera look: movement is left
+alone.
 
-When a text field inside the phone takes focus, the `phone:inputFocus` callback drops
-`KeepInput` so that typing does not walk the character, and restores it when the field is
-released.
+When a text field inside the phone takes focus, the game stops receiving the keyboard so that
+typing does not walk the character, and gets it back when the field is released.
 
 </details>
 
@@ -146,7 +148,8 @@ exports['nash_phone']:ToggleDisabled(false)  -- given back
 ```
 
 It blocks **every** opening path at once: the command, the key, the inventory item and the
-`ToggleOpen` export. `exports['nash_phone']:IsDisabled()` reads the current state.
+`ToggleOpen` and `OpenApp` exports. `exports['nash_phone']:IsDisabled()` reads the current
+state.
 
 </details>
 
@@ -207,6 +210,14 @@ Yes, two ways:
 looping on `AddCustomApp` cannot flood the home screen. Full walkthrough in
 [Add a third-party application](guides/add-custom-app.md).
 
+{% hint style="warning" %}
+Custom apps are **not listed in the App Store**. Keep `defaultApp = true` (the default) so the
+app is placed on the home screen. With `defaultApp = false` the app is not placed there, it is
+removed from the home screens that already showed it, and players have no way to find it,
+unless another resource gives it to them with the client export
+`exports['nash_phone']:SetAppInstalled('<identifier>', true)`.
+{% endhint %}
+
 </details>
 
 <details>
@@ -221,9 +232,9 @@ replace `exports['lb-phone']` with `exports['nash_phone']`: one line. If it is e
 unmodifiable, the separate `nash_lbcompat` gateway answers to the expected name and forwards
 the calls.
 
-An app is only as portable as the exports it actually uses. Exports that are not wired return
-a neutral value and write a console warning, so the app starts without crashing but without
-data.
+An app is only as portable as the exports it actually uses. LB Phone exports that are not
+wired exist so that calling them does not crash, but they do nothing and return nothing, so
+the app starts without crashing but without data.
 
 </details>
 
@@ -253,10 +264,10 @@ Yes, and without rebuilding anything. `locales/` holds one JSON file per languag
 runtime. Duplicate `locales/en.json`, translate it, and point `Config.Locale` (or add the code
 to `Config.ExtraLocales`) at it.
 
-Each file carries two blocks: `dict` (everything drawn on the phone screen, around 2 100
+Each file carries two blocks: `dict` (everything drawn on the phone screen, around 2 750
 strings) and `lua` (the messages shown outside the phone: notifications, warnings, key
-labels). Placeholders differ between the two: `{city}` and `{name}` in `dict`, `%s` and
-`%.1f` in `lua`: and must be kept intact. See [Add a language](guides/add-language.md).
+labels, around 80 strings). Placeholders differ between the two: `{city}` and `{name}` in
+`dict`, `%s` and `%.1f` in `lua`: and must be kept intact. See [Add a language](guides/add-language.md).
 
 A missing string falls back to English, then French, then shows its raw key. Nothing breaks.
 
@@ -281,11 +292,12 @@ file is shipped.
 
 <summary>Do calls work without pma-voice?</summary>
 
-The call rings, displays, connects and is written to the call log: it is simply silent. The
-voice provider is isolated in `client/modules/voice.lua` and checked with `GetResourceState`,
-so a missing voice resource degrades to a no-op rather than an error. Set
-`Config.Voice.provider` if you use something other than `pma-voice`; `/phonedeps` reports on
-the provider you actually configured, not on a hardcoded name.
+The call rings, displays, connects and is written to the call log: it is simply silent. A
+missing voice resource is not an error, the phone just skips the voice part.
+
+pma-voice is the only voice resource the phone drives: it puts each call on its own pma-voice
+call channel. Keep `Config.Voice.provider = 'pma-voice'` (the shipped value) in
+`config/main.lua`. Any other value leaves calls silent, even if that resource is running.
 
 </details>
 
@@ -293,9 +305,8 @@ the provider you actually configured, not on a hardcoded name.
 
 <summary>How many people can be in one call?</summary>
 
-Four, invited participants included (`MAX_PARTS` in `server/apps/phone.lua`). The cap is
-physical, not decorative: video travels as a **mesh**, each participant holding a connection
-to each other one. At four, each player already maintains three connections and sends three
+Four, invited participants included. The cap is fixed and physical, not decorative: video
+travels as a **mesh**, each participant holding a connection to each other one. At four, each player already maintains three connections and sends three
 copies of their stream. Beyond that you would need a video mixing server.
 
 An unanswered call becomes a missed call after 30 seconds.
@@ -313,9 +324,27 @@ degrades for everyone already connected and the broadcaster loses frames in thei
 Raising the number does not create capacity, it spreads the same capacity thinner.
 
 The stream stays open when the cap is reached: newcomers get a readable refusal instead of
-cutting anyone off. `Config.Social.Live.defaultAudience` (`'followers'` by default, also
-`'everyone'` or `'none'`) is only the value pre-selected on the launch screen; the player
-changes it at broadcast time.
+cutting anyone off. Only followers of the host can watch. `Config.Social.Live.audience`
+(`'followers'` by default, also `'everyone'` or `'none'`) decides who is **notified** when a
+live starts; it applies to every live on the server, and the host does not choose it.
+
+The host can also bring up to three viewers on screen as guests.
+
+</details>
+
+<details>
+
+<summary>Do InstaPic live streams have sound?</summary>
+
+Yes, by default: viewers hear the microphone of the host and of the guests on screen. It is
+`Config.Social.Live.microphone` in `config/social.lua`; `false` gives silent lives with no mic
+button. The game's own sound is never sent, because the embedded browser never receives GTA's
+audio mix. The sound travels with the picture, not through `pma-voice`, so it also needs
+`Config.VideoCall.enabled = true`, and a TURN relay for players behind a 4G box, CGNAT, strict
+NAT or a VPN.
+
+When a player's microphone is refused, missing or has not answered after 5 seconds, the live
+goes on with picture only and a red crossed-out mic button lets them try again.
 
 </details>
 
@@ -323,14 +352,17 @@ changes it at broadcast time.
 
 <summary>Do I need a TURN server for video calls and live streams?</summary>
 
-Not for most players. `Config.VideoCall.iceServers` ships with Google's public STUN server,
-which is enough to let two players find each other in the majority of cases.
+On a public server, yes. `Config.VideoCall.iceServers` ships with Google's public STUN server
+only, which works when both players' networks accept a direct connection.
 
-A **TURN** server relays the image when a direct connection is impossible: players behind
-CGNAT, some 4G routers, corporate networks. Without one, those players get the audio but no
-picture; the rest of the call works normally. A commented block in `config/main.lua` shows
-where to paste your credentials; keep the UDP, TCP and TLS entries together, as that is what
-gets through the most firewalls. Rent one or self-host `coturn`. Details in
+A **TURN** server relays the image when a direct connection is impossible: players behind a
+4G box, CGNAT, strict NAT or a VPN. Without one, those players get the audio but no picture;
+the rest of the call works normally.
+
+The simplest relay is Cloudflare: create a free account, create a TURN key, and paste its Key
+ID and API token into [`config/turn.lua`](config/config-turn.md). The free tier covers the
+first 1,000 GB each month. You can also use your own TURN server (coturn, or another provider
+with fixed credentials) in `Config.VideoCall.iceServers`. Details in
 [Video calls and live streams](guides/setup-video-calls.md).
 
 </details>
@@ -341,10 +373,12 @@ gets through the most firewalls. Rent one or self-host `coturn`. Details in
 
 No. The server only relays the handful of signalling messages that let the two embedded
 browsers find each other: an offer, an answer, connection candidates: a few kilobytes per
-call. The image travels directly from one player to the other.
+call. The image travels directly from one player to the other, or through the TURN relay
+(Cloudflare or your own) when no direct route exists.
 
-The relay only forwards between participants of a call that is actually in progress, and only
-if that call is a video call. Payloads above 16 KB are refused.
+The server's signalling relay only forwards between participants of a video call that is actually in progress,
+or of an InstaPic live in progress. Payloads above 16 KB are refused, and each player is held
+to a signalling budget of 512 KB per 10 seconds.
 
 </details>
 
@@ -442,13 +476,14 @@ Two things worth knowing before players rely on it:
 
 <summary>Is there a limit on how many photos a player can upload?</summary>
 
-Twelve uploads per minute per player. The counter is shared between the two callbacks that
-cost something (asking for a presigned URL, and the legacy relay), because both are halves of
-the same upload. It exists because removing the API key from the client prevents reading it,
-not using it: without a counter, a modified client could drain your Fivemanage quota without
-even sending a file.
+Yes: 24 upload requests per minute per player, which is about **12 photos a minute**, because
+each photo, snap or video sends two files (the media and its thumbnail). On top of that, a
+player can save at most 20 photos, videos and imports per minute in Photos. Both limits are
+fixed: they are not config settings. It exists because removing the API key from the client prevents
+reading it, not using it: without a counter, a modified client could drain your Fivemanage
+quota without even sending a file.
 
-A photo added by link counts on the same counter: up to two uploads per import, one for the
+A photo added by link counts on the same counter: up to two requests per import, one for the
 picture and one for its thumbnail.
 
 Photo and video sizes are set in `Config.Camera`: `Photo.LongEdgePx = 1920` at quality `0.8`,
@@ -557,6 +592,9 @@ Both are set when the framework finishes loading the player, not when the phone 
 opened: a player who has never taken their phone out is still reachable. `phoneName` is
 published on the same state bag.
 
+Treat both state bag keys as read-only. Only the phone's server writes them, and it puts back
+any value written from anywhere else, a client included.
+
 </details>
 
 <details>
@@ -616,40 +654,54 @@ in the phone's own settings.
 
 <details>
 
-<summary>What are the diagnostic commands, and who can run them?</summary>
+<summary>How do I check that the install is healthy?</summary>
 
-Set `Config.Debug = true` in `config/main.lua`, restart the resource, then:
+Restart the resource and read the server console from the top. Most lines are in French:
 
-| Command | What it answers |
+| Line | What it tells you |
 |---|---|
-| `/phonecheck` | The short verdict: only what stops the phone from working |
-| `/phonedeps` | Each dependency's state and what stops working without it |
-| `/phoneschema` | Whether the expected tables, columns and indexes are there |
-| `/phoneconfig` | The configuration **as the server actually read it** |
-| `/phonediag` | One player's phone: number, mail address, accounts, counts |
-| `/phonebase` | Row counts per table, all characters combined |
-| `/phonehelp` | The full list of test commands |
+| `framework détecté : …` and `inventaire détecté : …` | The bridges retained. When you named them in `config/bridge.lua`, the lines read `framework : … (imposé par la configuration).` and `inventaire : … (imposé par la configuration).` |
+| `schéma DB prêt (31 tables…)` | The database answered and the tables are in place |
+| `Langue « … » chargee : …` | One green line per language loaded |
+| Red block `Config.Upload is NOT configured` | `config/upload.lua` has no key: the camera is off |
+| Red block `Config.UseItem = true but the item "…" DOES NOT EXIST` | Nobody can open the phone. Printed 15 seconds after startup |
+| Yellow block `config/apps.lua : attention aux consequences ci-dessous.` | An app the others depend on is turned off |
 
-`/phoneconfig` is the one that pays off most often: it shows the *applied* configuration,
-which immediately reveals a malformed block that was silently ignored.
+Most red and yellow lines have their own entry in [Common Errors](common-errors.md); the
+`config/apps.lua` block is covered under *Can I disable an application?* above. Then test the
+phone in game.
 
-Being an admin is enough: `Config.DebugGroups` ships as `{ 'admin', 'superadmin' }`. The
-server console always has the right (type the name without a slash, `phonecheck`). The FiveM
-ACE `nash_phone.debug` still works alongside the groups:
+Three commands exist for specific jobs:
 
-```cfg
-add_ace identifier.license:YOUR_LICENSE nash_phone.debug allow
-```
+| Command | Where | What it does |
+|---|---|---|
+| `/phonepos` | In game | Prints in your F8 console the block to paste into `config/maps.lua` for your current position |
+| `/nashprop` | F8 console | Diagnoses the 3D model in hand |
+| `nashphone_cleanup` | Server console only | Counts the dead Discord-hosted gallery rows; `nashphone_cleanup confirm` deletes them |
 
-{% hint style="danger" %}
-Put `Config.Debug` back to `false` before opening. The other test commands write to the
-database and push events in the player's name: left open, they hand anyone who finds them a
-way to mint bank transfers. `Config.Debug` is the real barrier, not the permission check.
-{% endhint %}
+`/phonepos` and `/nashprop` are open to every player: they only print in that player's own
+console and change nothing.
 
-Two commands work without debug mode: `/phonepos` prints the block to paste into
-`config/maps.lua` for your current position, and `nashphone_cleanup` runs from the server
-console only.
+</details>
+
+<details>
+
+<summary>Can I log what players do with the phone on Discord?</summary>
+
+Yes, in `config/logs.lua`, a server-only file. Logs go to Discord webhooks, to Fivemanage, or
+both. Two kinds exist:
+
+- **Staff logs** carry the player's identity (character name, server ID, number, identifier,
+  Discord mention). Nineteen events: posts, stories, live streams, service requests, photos,
+  videos, photos added by link, bank transfers, social account creation, Cindr reports, and
+  private communications (SMS, private messages, mail, calls), which ship turned off.
+- **Public logs** carry the content only, never the identity, to feed roleplay channels. They
+  exist for posts, stories, live streams and service requests, and ship turned off.
+
+Logs ship set to Discord (`admin.service = 'discord'`) with every webhook empty, so nothing is
+sent until you fill one in. To check a webhook, trigger in game one of the events it receives:
+a refused send prints a line in the server console (see
+[Common Errors](common-errors.md#logs)). See [config/logs.lua](config/config-logs.md).
 
 </details>
 
@@ -658,9 +710,11 @@ console only.
 <summary>Is the phone branded NASH inside the game?</summary>
 
 Only where you leave it. `Config.Brand` in `config/main.lua` replaces the visible brand:
-`name` is used for the network operator in Settings → SIM, the account header, the device
-name, the settings footer and the sender of social verification texts. `studio` is the
-publisher shown on App Store pages (a value of `Nash` produces "Nash Arcade", "Nash Labs"),
+`name` is used for the network operator in Settings → SIM, the account header, the Wi-Fi
+network name, the device name, the settings footer, and the sender of a verification code for
+an app that has no sender name of its own (the six social apps sign their codes with their own
+name). `studio` is the
+publisher shown on the App Store page of every app, as written (`'Nash Store'` by default),
 and `site` is the bookmark on the browser's start page. `Config.City` in `config/settings.lua`
 sets the city name shown in the weather, clock, compass and social apps.
 

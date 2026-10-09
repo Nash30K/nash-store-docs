@@ -1,8 +1,9 @@
 # Custom Framework
 
 If you run a private or in-house framework, wire it into NASH Phone by filling in one file:
-`server/bridge/custom.lua`. It is the only file in the resource meant to be edited: everything
-else can be updated without touching it.
+`server/bridge/custom.lua`. It is the only bridge file meant to be edited, and with
+`config/*.lua` the only Lua that stays readable in the escrow-protected release: every other
+file is encrypted.
 
 Nothing in this file is used until `Config.Framework` says so.
 
@@ -58,8 +59,15 @@ that is what makes the file order inside the glob irrelevant.
 ### `playerLoadedEvent`
 
 The phone listens to the `playerLoadedEvent` of **every registered provider**, without
-resolving any of them, and hands the subscriber a bare `source`. Naming your event here is
-enough: there is no argument shape to match.
+resolving any of them. It finds the player in the event's **first argument**, in this order:
+
+1. a number: the player's server ID (the ESX way);
+2. a table: its `PlayerData.source`, or its `source` field (the QBCore and QBOX way);
+3. otherwise, the `source` of the event itself, which is right for a network event.
+
+If none of them gives a valid server ID, the player is skipped and the console prints
+`playerLoadedEvent : source introuvable sur « <event> », joueur ignoré`. So fire your event
+with the server ID first, or with your player object.
 
 Leave it `nil` if your framework has no such event. The phone then catches up at the first NUI
 bootstrap, slightly later: the player is hydrated when they open the phone rather than when
@@ -68,9 +76,10 @@ they spawn.
 ### `playerUnloadedEvent`
 
 The server event your framework fires when a player goes back to character selection without
-disconnecting, with the server ID as its **first argument**. The phone then ends the call in
-progress, stops the number from ringing this player, closes a byCloud session and takes the
-player off duty, exactly as on a disconnection.
+disconnecting, with the server ID as its **first argument** (it is read the same way as
+`playerLoadedEvent` above). The phone then ends the call in progress, stops the number from
+ringing this player, stops the music and an InstaPic live, closes a byCloud session and takes
+the player off duty, exactly as on a disconnection.
 
 Leave it `nil` on a framework without multiple characters: a real disconnection is already
 handled by `playerDropped`. On a multi-character framework, leaving it `nil` lets the next
@@ -96,7 +105,6 @@ The phone still boots, which is what lets you wire the bridge in stages.
 | `getBank` | The Bank app shows 0 and transfers fail |
 | `job` | The Services app recognises no employee |
 | `usableItem` | The phone no longer opens from the inventory item, only from the key and `/phone` |
-| `group` | No admin command is granted (the `nash_phone.debug` ACE still works) |
 | `setPhoneNumber` | `Config.Phone.syncFramework` copies nothing into your character data |
 
 ## The interface
@@ -123,7 +131,7 @@ source, anything regenerated on connect: gives the player an empty phone every t
 the previous rows orphaned.
 {% endhint %}
 
-Called from roughly ninety places in the resource. It is the one function with no survivable
+Called from nearly a hundred places in the resource. It is the one function with no survivable
 fallback.
 
 </details>
@@ -156,20 +164,6 @@ string prints a hole.
 
 Neutral value: `nil`. Used by the Settings profile, mail senders, AirDrop, the share sheet and
 Services requests.
-
-</details>
-
-<details>
-
-<summary>group(src)</summary>
-
-Returns the admin group as a string (`'admin'`, `'superadmin'`, …), or `nil` when unknown.
-
-Return `nil`, not `'user'`, while the player is loading: confusing "not known yet" with "plain
-player" rejects an admin who has just connected.
-
-Compared against `Config.DebugGroups` (default `{ 'admin', 'superadmin' }`) to gate the
-`/phone*` test commands. Neutral value: `nil`.
 
 </details>
 
@@ -323,7 +317,7 @@ try to override them:
 | `Framework.itemPorteSerial(src, item, serial)` | Delegated to the **inventory** bridge |
 | `Framework.hasJob(src, name)` | `job(src).name == name`, strict: no case folding, no trimming |
 | `Framework.jobPlayers(name)` | A scan of the native `GetPlayers()`, filtered with `hasJob` |
-| `Framework.name()` | The resolved bridge name, reported by `/phonedeps` |
+| `Framework.name()` | The resolved bridge name, `'aucun'` while none is found |
 | `Framework.onPlayerLoaded(fn)` | Your `playerLoadedEvent` |
 | `Framework.onPlayerUnloaded(fn)` | Your `playerUnloadedEvent` |
 | `Framework.attendre(seconds)` | Waits up to `seconds` (60 by default) for a framework to be resolved, before the usable items are registered |
@@ -333,8 +327,8 @@ be visible, not silently half-matched.
 
 ## Registering under your own name
 
-Instead of filling `NashFw.custom`, you can add a provider under its own name, in its own file
-inside `server/bridge/`:
+Instead of filling `NashFw.custom`, you can add a provider under its own name, in the same file
+`server/bridge/custom.lua`, next to `NashFw.custom`:
 
 ```lua
 NashFw.myframework = {
@@ -356,15 +350,15 @@ register under any other name will **never** be picked by `'auto'`, even with a 
 prints the list of the ones that do exist.
 {% endhint %}
 
-A file added under `server/bridge/` is loaded by the existing glob in `fxmanifest.lua`, so no
-manifest edit is needed: but it is a new file, and a resource update will not carry it over
-unless you keep a copy.
+Keep a copy of `server/bridge/custom.lua` before an update: replacing the resource folder
+replaces it too.
 
 ## Checklist
 
 1. `[nash_phone] framework : custom (imposé par la configuration).` appears at start.
 2. No `n'implémente pas` warnings remain for functions you meant to fill.
-3. `/phonedeps` reports the framework in use and the phone item as declared.
+3. The `inventaire ...` line names the expected inventory, and no red `DOES NOT EXIST` block
+   about the phone item appears in the 15 seconds that follow.
 4. The phone opens, and Settings shows a phone number and the character's real RP name.
 5. Reconnect: the same character gets **the same number** and the same messages back. This is
    the `identifier` stability test, and it is the one that matters most.
@@ -373,4 +367,3 @@ unless you keep a copy.
    on both sides; a transfer to a player who disconnects mid-way refunds the sender.
 8. A player holding a job listed in `config/services.lua` sees their service page.
 9. Using the phone item from the inventory opens the phone.
-10. An admin passes `/phonehelp`; a plain player is refused.

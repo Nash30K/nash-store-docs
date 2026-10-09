@@ -78,6 +78,7 @@
     * [config/music.lua](nash-phone/config/config-music.md)
     * [config/services.lua](nash-phone/config/config-services.md)
     * [config/upload.lua](nash-phone/config/config-upload.md)
+    * [config/turn.lua](nash-phone/config/config-turn.md)
     * [config/logs.lua](nash-phone/config/config-logs.md)
     * [config/setup.lua](nash-phone/config/config-setup.md)
     * [config/custom\_apps.lua](nash-phone/config/config-custom-apps.md)
@@ -100,4 +101,3 @@
     * [Client Events](nash-phone/developer-api/client-events.md)
     * [Commands](nash-phone/developer-api/commands.md)
     * [Custom Apps](nash-phone/developer-api/custom-apps.md)
-  * [Changelog](nash-phone/changelog.md)

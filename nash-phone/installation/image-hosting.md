@@ -15,8 +15,18 @@ Everything happens in `config/upload.lua`.
 | Photos, add by link | The **+** button of the Albums tab does not appear: a pasted link would have nowhere to be re-hosted |
 | Camera roll, profile pictures, social posts | Nothing new to display: they all read links produced by the features above |
 
-`/phonecheck` lists a missing host as a non-blocking issue, and `/phonedeps` tells you whether
-the problem is the host or `screenshot-basic`.
+As long as no key is set, the server console prints this block in red at every start. Once
+`provider` and `apiKey` are filled, it no longer appears:
+
+```
+========================================================================
+[nash_phone] Config.Upload is NOT configured -> the CAMERA IS DISABLED.
+[nash_phone] The phone only stores a LINK to each picture, so an image host
+[nash_phone] is required. Set this in config/upload.lua:
+[nash_phone]    provider = 'fivemanage'  + apiKey = '<Fivemanage API key>'
+[nash_phone] Free account, no credit card: https://fivemanage.com
+========================================================================
+```
 
 ## Getting a token
 
@@ -50,8 +60,9 @@ with any file browser. Your API token would become public, and anyone could burn
 your account.
 {% endhint %}
 
-This is why it is the only config file loaded outside the `shared_scripts` block in
-`fxmanifest.lua`, and why the block that loads the others carries a comment saying so.
+This is why it is loaded in `server_scripts` in `fxmanifest.lua`, away from the other config
+files. `config/turn.lua` and `config/logs.lua` are the only other ones loaded there, for the same
+reason: they hold a TURN API token and your webhook links.
 
 The client never needs the token. It asks the server one question ("is a host configured?")
 and gets back a single boolean:
@@ -67,8 +78,8 @@ mid-game, and the Camera app asks on every open.
 
 | Path | Who posts the file | Used by |
 |---|---|---|
-| **Presigned** | The client, straight to the host | Camera stills (posted by `screenshot-basic` from its own page), videos, and pictures added by link in the Photos app |
-| **Relay** | The server, from a base64 payload | Fallback only. Kept for a host that cannot presign, and for the browser preview |
+| **Presigned** | The client, straight to the host | Camera photos and videos and their thumbnails (posted by the phone's interface), snaps, pictures added by link in the Photos app, and the `screenshot-basic` captures (posted by `screenshot-basic` from its own page) |
+| **Relay** | The server, from a base64 payload | Nothing in the current version: with Fivemanage the server always answers with a presigned address. The path is kept for a host that cannot presign |
 
 The presigned path exists because the image must not travel through the FiveM network at all.
 A reliable network event drops its packet past **393 216 bytes**, and the server then kicks the
@@ -90,16 +101,17 @@ Both callbacks share one counter, because they are two halves of the same upload
 |---|---|
 | Window | 60 seconds |
 | Points per window | 24 |
-| Cost of a presign request | 2 |
+| Cost of a presign request | 1 |
 | Cost of a relay upload | 2 |
 
-That is **12 uploads per player per minute**. The limit is checked before the round trip to
-Fivemanage, since it is that round trip, and the quota it spends on your account, that a
-modified client would try to run in a loop.
+That is **24 presigned addresses per player per minute**. A Camera photo or video asks for two
+(the file and its thumbnail), so a player can save about **12 photos or videos a minute**. The
+limit is checked before the round trip to Fivemanage, since it is that round trip, and the quota
+it spends on your account, that a modified client would try to run in a loop.
 
 Adding a photo by link draws on the same counter and the same account. An import asks for up to
 **two** presigned addresses, one for the picture and one for its thumbnail, so a player can add
-about six pictures a minute. A link that is already on Fivemanage is uploaded again like any
+about 12 pictures a minute. A link that is already on Fivemanage is uploaded again like any
 other, so that the copy lives on your account and follows your size settings.
 
 ## Error codes

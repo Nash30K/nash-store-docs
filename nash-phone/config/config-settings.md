@@ -19,7 +19,8 @@ Config.City = {
 ## Where it shows up
 
 The lock-screen weather widget, the home-screen widget, the Weather app, Clock, Compass, the
-App Store, the social networks, and the starter mail and calendar entries.
+App Store, the social networks (an InstaPic post is tagged with the city name), and the country
+list of the first-run setup when `config/setup.lua` offers none.
 
 The phone ships set to Los Santos, GTA V's base map. If your server runs a custom map (Chicago,
 Detroit, a European city), replace the name here: there is nowhere else to edit, nothing is
@@ -33,11 +34,9 @@ alone, with no orphan comma.
 ## Set this before opening your server
 
 {% hint style="warning" %}
-Mail, Calendar, Notes and the social networks write their **starter content** into a player's
-phone the first time that player opens them, then never touch it again: which is what lets them
-keep their mail and notes between sessions. A player who has already opened those apps therefore
-keeps the old city name inside that starter content, even after you change it here. Every other
-screen follows immediately.
+What was saved with the old name keeps it: an InstaPic post stores the city name it was
+published with, and a player who finished the first-run setup keeps the country they picked.
+Every other screen follows the new name after a restart of the resource.
 {% endhint %}
 
 ## What this setting does not change

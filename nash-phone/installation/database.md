@@ -2,18 +2,20 @@
 
 ## Nothing to import
 
-The schema builds itself. `server/db/schema.lua` runs at every start of the resource and
-creates the 27 tables it needs. On success it prints:
+The schema builds itself. The resource runs its schema pass at every start and creates the 31
+tables it needs. On success it prints:
 
 ```
-[nash_phone] schéma DB prêt (27 tables).
+[nash_phone] schéma DB prêt (31 tables).
 ```
 
 If it also had catching up to do, the same line reports it:
 
 ```
-[nash_phone] schéma DB prêt (27 tables, 4 colonne(s) ajoutée(s), 2 index ajouté(s)).
+[nash_phone] schéma DB prêt (31 tables, 4 colonne(s) ajoutée(s), 2 index ajouté(s)).
 ```
+
+A column that was widened (see `TYPES` below) is not counted on that line.
 
 `sql/nash_phone.sql` contains the same `CREATE TABLE` statements. **It is not read by the
 resource.** It exists as a reference, and so you can prepare the database by hand before the
@@ -21,12 +23,12 @@ first boot if your workflow requires it. It is not a required step, and importin
 replace a first start (see [The `.sql` file is not enough](#the-sql-file-is-not-enough)).
 
 The MySQL account used by `oxmysql` must be able to run `CREATE TABLE`, `ALTER TABLE` and to
-read `information_schema`. Without `ALTER`, new columns silently fail to appear and the apps
-that need them answer with errors.
+read `information_schema`. Without `ALTER`, new columns and indexes are never added and the
+apps that need them answer with errors.
 
 ## Tables
 
-All 27 tables are prefixed `nash_phone_`. Every per-character table is keyed on `owner`, the
+All 31 tables are prefixed `nash_phone_`. Every per-character table is keyed on `owner`, the
 identifier returned by your framework (ESX license, QB citizenid).
 
 ### Device and player
@@ -56,7 +58,7 @@ identifier returned by your framework (ESX license, QB citizenid).
 |---|---|
 | `nash_phone_gallery` | Photos and videos. Stores the hosted **URL**, never the file. `kind` is `photo` or `video`; `album` says where the media came from (see below) |
 | `nash_phone_notifications` | Phone notifications, purged on a schedule (`Config.Notifications`) |
-| `nash_phone_appdata` | Notes, Calendar, Reminders and Mail content: one JSON blob per character and per app |
+| `nash_phone_appdata` | Notes, Calendar and Reminders content, plus extra data of the Contacts app: one JSON blob per character and per app, 256 KB at most |
 | `nash_phone_bank` | Wallet ledger shown in the phone |
 
 The `album` column of `nash_phone_gallery` records where a media came from:
@@ -102,6 +104,15 @@ and differ only in presentation.
 |---|---|
 | `nash_phone_service_requests` | Requests sent to jobs from the Services app. Live state (who is on duty) stays in server memory and is not persisted |
 
+### Cindr (dating app)
+
+| Table | Purpose |
+|---|---|
+| `nash_phone_dating_profiles` | One dating profile per account: display name, age, bio, photos, visibility, age range sought, optional neighbourhood |
+| `nash_phone_dating_swipes` | Who liked or passed on whom. Primary key `(app_id, swiper, target)` |
+| `nash_phone_dating_matches` | Mutual likes |
+| `nash_phone_dating_reports` | Reports sent from the app, with their reason (see `Config.Social.Dating.reports`) |
+
 ## Migrations
 
 This is the part that matters on a server that is already running.
@@ -109,12 +120,12 @@ This is the part that matters on a server that is already running.
 {% hint style="warning" %}
 `CREATE TABLE IF NOT EXISTS` does **nothing** to a table that already exists. A column added
 in a later version would never reach an installation that has been live for months. That is
-why `server/db/schema.lua` holds four separate lists, not one.
+why the resource keeps four separate lists, not one.
 {% endhint %}
 
 | List | What it does | When it acts |
 |---|---|---|
-| `DDL` | The 27 `CREATE TABLE IF NOT EXISTS` statements | Creates missing tables. Skips existing ones entirely |
+| `DDL` | The 31 `CREATE TABLE IF NOT EXISTS` statements | Creates missing tables. Skips existing ones entirely |
 | `COLUMNS` | 22 `{ table, column, definition }` entries | Adds any column that is missing, on fresh **and** existing databases |
 | `INDEXES` | 9 `{ table, index, columns }` entries | Adds any index that is missing |
 | `TYPES` | 2 `{ table, column, expected type, definition }` entries | **Widens** a column that exists but is too narrow. Never narrows one |
@@ -122,7 +133,8 @@ why `server/db/schema.lua` holds four separate lists, not one.
 Every catch-up pass first asks `information_schema` what already exists (one query for the
 columns, one for the indexes, one for the column types), then runs only the `ALTER TABLE`
 statements that are actually needed. On a database that is already up to date, a boot costs
-three `information_schema` queries and nothing else.
+the `CREATE TABLE IF NOT EXISTS` statements (which change nothing) and three
+`information_schema` queries, and no `ALTER TABLE` at all.
 
 {% hint style="info" %}
 `COLUMNS` only **adds** a column that is absent. It never looks at the type of a column that
@@ -181,47 +193,65 @@ nothing about them.
 
 ## Verifying the schema
 
-With `Config.Debug = true`, `/phoneschema` compares the live database against the expected
-lists and reports missing tables, missing columns and missing indexes, with what each one
-costs you.
+The boot line is the first check. `schéma DB prêt (31 tables)` means the schema pass ran to
+the end, and an index that could not be added gets its own line (`index … sur … non créé : …`).
+If the `schéma DB prêt` line never appears, the pass stopped on a database error: read the
+error printed above it, often a MySQL account without the `CREATE` or `ALTER` right.
 
+To look further, query the database directly:
+
+```sql
+-- 31 rows expected
+SHOW TABLES LIKE 'nash\_phone\_%';
+
+-- the columns of one table, to compare with "Columns added after first release"
+SHOW COLUMNS FROM nash_phone_gallery;
+
+-- the indexes of one table, to compare with "Indexes added after first release"
+SHOW INDEX FROM nash_phone_messages;
 ```
-/phoneschema
+
+To spot a table growing abnormally on a long-running server, count its rows, all characters
+included:
+
+```sql
+SELECT COUNT(*) FROM nash_phone_notifications;
 ```
 
 {% hint style="info" %}
-`/phoneschema` reports any `nash_phone_` table it does not know as `en trop` ("unknown
-table, probably from an older version"). All 27 tables above are known to it. If an older
-version of the command reports `nash_phone_setup`, `nash_phone_service_requests` or
-`nash_phone_faceid` that way, it is wrong: all three are created by `server/db/schema.lua`
-and are in active use. **Do not drop them.**
+All 31 tables listed above are created by the resource and in active use, including
+`nash_phone_setup`, `nash_phone_service_requests`, `nash_phone_faceid` and the
+`nash_phone_dating_` tables. **Do not drop them.**
 {% endhint %}
-
-`/phonebase` prints a real `COUNT(*)` per table, all characters included: useful to spot a
-table growing abnormally on a long-running server.
 
 ## Sizing and limits
 
 - **Phone numbers** are stored in `VARCHAR(16)`. The generated form is
   `<prefix>-<digits>`, so `Config.Phone.prefix = '555'` with `digits = 7` gives `555-1234567`,
   11 characters. If your own values push the total past 16, number assignment either fails or
-  the number is truncated depending on the SQL mode. `/phonecheck` refuses to go green on
-  that case.
+  the number is truncated depending on the SQL mode. Nothing checks this at boot, so keep
+  the prefix, the dash and `digits` at 16 characters or fewer in total.
 - **Media URLs** live in `TEXT` columns. The phone stores links, never the files themselves,
   so the database stays small regardless of how many photos players take.
 - **Notifications** are purged by a task that starts a minute after boot and then runs
-  hourly, driven by
-  `Config.Notifications.keepReadDays` (3) and `keepDays` (30). Set either to `0` to disable
-  that half of the purge. Without a purge, the table grows forever.
+  hourly, driven by `Config.Notifications.keepReadDays` (3) and `keepDays` (30) in
+  `config/main.lua`. Set either to `0` to disable that half of the purge. Without a purge, the
+  table grows forever. On top of that, `config/notifications.lua` deletes a player's
+  notifications when they disconnect (`purgeOnDrop`) and when they connect (`purgeOnJoin`),
+  both `true` by default.
+- **Social notifications** (`nash_phone_social_notifs`) have their own purge, set in
+  `Config.Social.Notifs` (`config/social.lua`).
 
 ## Upgrading
 
 1. Back up the database.
-2. Replace the resource folder, keeping your `config/` files.
+2. Replace the resource folder, keeping your own files: `config/`, `server/bridge/custom.lua`
+   if you filled it, any language file you added to `locales/` (your edits to `fr.json` and
+   `en.json` are replaced, note them first), and your PNG files in `service_icons/`.
 3. Restart the resource, and read the `schéma DB prêt` line: it tells you exactly how many
    columns and indexes were added.
-4. Run `/phoneschema` with `Config.Debug = true` to confirm, then set `Config.Debug` back to
-   `false`.
+4. Check that no `index … non créé` line appeared. To confirm further, see
+   [Verifying the schema](#verifying-the-schema).
 
 {% hint style="danger" %}
 Never change `Config.Framework` on a live server. Every table is keyed on the identifier the

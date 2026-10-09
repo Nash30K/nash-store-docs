@@ -57,7 +57,7 @@ The normal path, and the only one that works when your app has an interface, bec
 local ok = exports['nash_phone']:AddCustomApp(app)
 ```
 
-**Returns:** `boolean`. `false` when the declaration was refused; the reason is printed to the console.
+**Returns:** `boolean`. `false` when the declaration was refused; the reason is printed to the client console (F8), even with `Config.CustomAppsSettings.debug` off. It is refused when the argument is not a table, when `identifier` is missing, when `ui` has no `/`, or when the cap of `Config.CustomAppsSettings.max` apps is reached.
 
 Call it **client-side**, after the phone resource is started. `GetInvokingResource()` records which resource declared the app, which is what routes `fetchNui` later and what allows the automatic cleanup below.
 
@@ -76,8 +76,8 @@ Config.CustomApps = {
     example = {
         identifier = 'example',
         name = 'Example',
-        description = 'An example app, no interface.',
-        developer = 'NASH',
+        description = 'An example app, without an interface.',
+        developer = 'Nash Store',
         defaultApp = true,
         size = 128,
         onUse = function()
@@ -117,23 +117,20 @@ You rarely need `RemoveCustomApp`: when your resource stops, the phone removes e
 
 | Field | Type | Description |
 |---|---|---|
-| `identifier` | `string` | **Required.** Unique key, never shown to the player. Two apps cannot share one |
+| `identifier` | `string` | **Required.** Unique key, never shown to the player. Declaring an app with an identifier already in use replaces the previous one. `id` is accepted as an alias |
 | `name` | `string` | Label under the icon. Defaults to `identifier` |
-| `description` | `string` | Shown on the App Store page |
-| `developer` | `string` | Author, shown on the App Store page |
-| `icon` | `string` | Icon URL. For an image in your resource: `'https://cfx-nui-' .. GetCurrentResourceName() .. '/ui/icon.png'` |
-| `ui` | `string` | Path to your HTML, **prefixed with your resource name**. Without it the app only calls `onUse` and opens nothing |
-| `defaultApp` | `boolean` | `true` (default) puts it on the home screen from the first boot. `false` means it has to be downloaded from the App Store |
-| `game` | `boolean` | Files it under the App Store's Games category |
-| `size` | `number` | Weight announced in the App Store, in KB. Cosmetic only |
-| `images` | `table` | Array of screenshot URLs for the App Store page |
-| `price` | `number` | In-game price to download it. `0` is free |
+| `icon` | `string` | Icon URL. For an image in your resource: `'https://cfx-nui-' .. GetCurrentResourceName() .. '/ui/icon.png'`. Without it, the icon is a coloured tile with the first letter of `name` |
+| `ui` | `string` | Path to your HTML, **prefixed with your resource name**. Without it the app only calls `onUse` and shows a short "no interface" message |
+| `defaultApp` | `boolean` | `true` (default) puts the icon on the home screen. `false`: see the warning below |
 | `landscape` | `boolean` | Renders the app in landscape (the chassis stays upright, the interface rotates) |
-| `keepOpen` | `boolean` | The phone does **not** close when the player opens the app. For apps that take over the screen, such as a camera |
 | `onUse` | `function` | Called **client-side** when the app is opened |
 | `onServerUse` | `function` | Called **server-side** with the player's `source`. Only works from `Config.CustomApps`: see below |
+| `description`, `developer`, `game`, `size`, `images`, `price` | | Accepted so a table written for another phone loads unchanged, but **not displayed anywhere**: custom apps are not listed in the App Store. In the App Store, the publisher shown for every app is `Config.Brand.studio` (`config/main.lua`, `'Nash Store'` by default) |
+| `keepOpen` | `boolean` | Accepted for the same reason, **no effect** in NASH Phone |
 
-`size` and `price` are coerced with `tonumber` and fall back to `0`.
+{% hint style="warning" %}
+**`defaultApp = false` makes the app unreachable for players.** The icon is not placed on the home screen, and it is also removed from the home screens where it already was, unless the app is in that player's installed list. Custom apps are not listed in the App Store, so players cannot download it themselves. To hand such an app to some players only, call the client export `SetAppInstalled(identifier, true)` for them from your own script (for example on a job change); `OpenApp(identifier)` also opens it directly. See [Client Exports](client-exports.md).
+{% endhint %}
 
 {% hint style="info" %}
 `Config.CustomAppsSettings.max` caps how many custom apps can be registered at once, default `40`. A buggy resource calling `AddCustomApp` in a loop cannot flood the home screen. Set `Config.CustomAppsSettings.debug = true` to print every add and remove: the fastest way to tell "not declared" from "declared but not displayed".
@@ -141,7 +138,7 @@ You rarely need `RemoveCustomApp`: when your resource stops, the phone removes e
 
 ## The open hooks
 
-Opening an app runs, in order: `onUse` on the client, then: if the declaration carries one: `onServerUse` on the server, then the public event.
+Opening an app runs, in order: `onUse` on the client, then, only if the declaration carries an `onServerUse` function, a message to the server, which calls that `onServerUse` (for an app of `Config.CustomApps`) and fires the public event `nash_phone:customAppUsed`. An app declared without `onServerUse` stops after `onUse`: nothing reaches the server.
 
 <details>
 
@@ -164,7 +161,7 @@ end,
 Receives the player's `source`. Also wrapped in `pcall`, with the failure printed as `onServerUse de « … » a échoué`.
 
 {% hint style="warning" %}
-`onServerUse` **only works for apps declared in `Config.CustomApps`.** An app declared at runtime by a client script cannot deliver this function to the server: a Lua function does not cross the network, and the client-side `nash_phone:customApp:use` event is deliberately restricted to names present in the phone's own config, since it comes from an untrusted source. For a runtime-declared app, listen to the public event instead.
+`onServerUse` **only works for apps declared in `Config.CustomApps`.** An app declared at runtime by a client script cannot deliver this function to the server: a Lua function does not cross the network, and the server only looks for `onServerUse` in the phone's own config. For an app declared from your own resource, use your own NUI callback instead (see below).
 {% endhint %}
 
 </details>
@@ -173,17 +170,47 @@ Receives the player's `source`. Also wrapped in `pcall`, with the failure printe
 
 <summary>nash_phone:customAppUsed: server event</summary>
 
-The supported server-side entry point for apps declared at runtime.
+Fired on the server right after `onServerUse`, so only for apps whose declaration carries an `onServerUse` function.
 
 ```lua
 -- server.lua of YOUR resource
 AddEventHandler('nash_phone:customAppUsed', function(src, identifier)
-    if identifier ~= 'my_bank' then return end
+    if identifier ~= 'example' then return end
     print(('player %s opened the app'):format(src))
 end)
 ```
 
-It fires for **every** custom app on the server, so always filter on `identifier`. Note the underscore prefix (`nash_phone:`, not `nash-phone:`). Full description in [Server Events](server-events.md).
+Always filter on `identifier`, and do not grant anything on this event alone: the identifier comes from the player's client. Note the underscore prefix (`nash_phone:`, not `nash-phone:`). Full description in [Server Events](server-events.md).
+
+</details>
+
+<details>
+
+<summary>Reacting on the server to an app declared from your resource</summary>
+
+An app declared with `AddCustomApp` has no reliable server hook in the phone. Its server entry point is your own interface: once the page is mounted, it calls one of your NUI callbacks, which triggers your own server event.
+
+```js
+// ui/index.html of YOUR resource. The third argument names your resource explicitly,
+// so the call works even before the phone has sent its context to the page.
+fetchNui('opened', {}, 'my_resource')
+```
+
+```lua
+-- client.lua of YOUR resource
+RegisterNUICallback('opened', function(_, cb)
+    TriggerServerEvent('my_bank:opened')
+    cb({ ok = true })
+end)
+```
+
+```lua
+-- server.lua of YOUR resource
+RegisterNetEvent('my_bank:opened', function()
+    local src = source
+    -- Your server-side reaction, with your own checks
+end)
+```
 
 </details>
 
@@ -216,7 +243,9 @@ Loading it from `nash_phone` keeps your app in step with phone updates. The file
 const infos = await fetchNui('getInfos', { page: 1 })
 ```
 
-No routing is involved: your page is served by your resource, so a `fetch` to your own origin lands naturally on your own `RegisterNUICallback`. `scriptName` is only there to target **another** resource.
+No routing is involved: your page is served by your resource, so a `fetch` to your own origin lands naturally on your own `RegisterNUICallback`. The Promise resolves to the parsed JSON answer, or `null` when the answer is not JSON.
+
+Without `scriptName`, the target is `resourceName`, which only exists once the phone has sent its context to the page, shortly after the bridge loads. A call made before that rejects with `nash-bridge : contexte pas encore reçu`. Passing your own resource name as `scriptName` removes that wait; it can also target **another** resource.
 
 ```lua
 -- client.lua of YOUR resource
@@ -247,7 +276,9 @@ onNuiEvent('tick', (data) => {
 The table you pass **must** be shaped `{ action = '…', data = { … } }`: the same shape as `SendNUIMessage`. `onNuiEvent` dispatches on `action` and hands your handler the `data` field only. A flat table is delivered but matches no listener.
 {% endhint %}
 
-Both return `boolean`. The client export returns `false` when the identifier is not registered; the server export returns `false` on a malformed `src` or `identifier`. The message is only relayed to the app whose identifier matches, so two custom apps open at once do not see each other's traffic.
+Both return `boolean`. The client export returns `false` when the identifier is not registered; the server export returns `false` on a malformed `src` or `identifier` (it does not check that the app exists). The message is only relayed to the app whose identifier matches, so two custom apps open at once do not see each other's traffic.
+
+A message only reaches your page while the app is open on screen and its page has loaded the bridge. Nothing is queued: a message sent while the app is closed, or before the page has finished loading, is lost. This is why your page should ask for its data with `fetchNui` rather than wait for a push.
 
 ### Theme
 
@@ -274,31 +305,31 @@ In landscape (`landscape = true`) the frame is rotated to 874 × 402 px; the cha
 
 Sheets, pickers and full-screen overlays must cover the whole display, status bar included, or they immediately read as "not the system". Your iframe cannot draw outside itself, so the phone paints them and your app only asks.
 
-Every call returns a Promise. It resolves **when the sheet closes**, not when it opens. Only one component is open at a time, as on iOS.
+Every call returns a Promise. For a sheet, it resolves **when the sheet closes**, not when it opens. Only one component is open at a time, as on iOS: opening a second one replaces the first, and the Promise of the first never resolves.
 
-| Component | State | Call |
-|---|---|---|
-| `setPopUp` | available | `components.setPopUp({ title, description, buttons, attachment })` |
-| `setContextMenu` | available | `components.setContextMenu({ title, buttons })` |
-| `setContactSelector` | available | `components.setContactSelector({ onSelect })` |
-| `setColorPicker` | available | `components.setColorPicker({ onSelect, onClose })` |
-| `setEmojiPickerVisible` | available | `components.setEmojiPickerVisible({ onSelect })` |
-| `setGallery` | available | `components.setGallery({ onSelect, includeImages, includeVideos, multiSelect })` |
-| `setFullscreenImage` | available | `components.setFullscreenImage(url)` |
-| `setHomeIndicatorVisible` | available | `components.setHomeIndicatorVisible(true \| false)` |
-| `saveToGallery` | available | `components.saveToGallery(url)`: resolves to the photo id, or `null` |
-| `createCall` | available | `createCall({ number, videoCall, hideNumber })` |
-| `uploadMedia` | not wired | resolves `null` |
-| `setShareComponent` | not wired | resolves `null` |
-| `setGifPickerVisible` | not wired | resolves `null` |
-| `createGameRender` | not wired | resolves a handle whose calls do nothing |
-| `GameMap` | not wired | resolves `null` on every method |
+| Component | State | Call | Resolves to |
+|---|---|---|---|
+| `setPopUp` | available | `components.setPopUp({ title, description, buttons, attachment })` | Index of the button pressed (from `0`), or `null` when dismissed by tapping outside |
+| `setContextMenu` | available | `components.setContextMenu({ title, buttons })` | Index of the button pressed, or `null` on Cancel |
+| `setContactSelector` | available | `components.setContactSelector({ onSelect })` | `{ firstname, lastname, number, avatar, display }`, or `null` |
+| `setColorPicker` | available | `components.setColorPicker({ onSelect, onClose })` | The colour picked, as `'#rrggbb'`, or `null` |
+| `setEmojiPickerVisible` | available | `components.setEmojiPickerVisible({ onSelect })` | The emoji picked, or `null` |
+| `setGallery` | available | `components.setGallery({ onSelect, includeImages, includeVideos, multiSelect })` | `{ src, isVideo, id }`, an array of them with `multiSelect`, or `null` |
+| `setFullscreenImage` | available | `components.setFullscreenImage(url)` | `null`, when the player taps to close |
+| `setHomeIndicatorVisible` | accepted, no effect | `components.setHomeIndicatorVisible(true \| false)` | `true`. The home indicator does not change today |
+| `saveToGallery` | available | `components.saveToGallery(url)` | The photo id, or `null` when refused |
+| `createCall` | available | `createCall({ number, videoCall, hideNumber })` | `{ ok: true, data: { id, … } }`, `{ ok: false, error }` (for example `offline`, `busy`), or `null` |
+| `uploadMedia` | not wired | `components.uploadMedia(type, blob)` | `null` |
+| `setShareComponent` | not wired | | `null` |
+| `setGifPickerVisible` | not wired | | `null` |
+| `createGameRender` | not wired | `components.createGameRender(canvas)` | A handle whose calls do nothing |
+| `GameMap` | not wired | `components.GameMap(container, options)` | Returns an object at once; its `ready` and every method resolve `null` |
 
 {% hint style="info" %}
 Nothing on this list can crash your app. A component that is not wired resolves to a **neutral value and prints a console warning naming it**, so you know which one you are missing instead of debugging a silent Promise.
 {% endhint %}
 
-**Buttons:** `buttons` is an array of `{ title, color, cb }`. `cb` is a function; see the callback note below.
+**Buttons:** `buttons` is an array of `{ title, color, cb }`. `cb` is a function; see the callback note below. `color` is a colour **name**, not a hex code: `'red'` or `'green'` in a pop-up, `'red'` in a context menu. Any other value, or none, gives the system blue.
 
 ```js
 await components.setPopUp({
@@ -306,18 +337,24 @@ await components.setPopUp({
   description: 'Transfer 500 $ ?',
   buttons: [
     { title: 'Cancel' },
-    { title: 'Confirm', color: '#34c759', cb: () => doTransfer() },
+    { title: 'Confirm', color: 'green', cb: () => doTransfer() },
   ],
 })
 ```
 
-**Emoji picker:** pass an object. `setEmojiPickerVisible({ onSelect })` opens it, `setEmojiPickerVisible({ visible: false })` closes it. An empty object or a bare boolean is read as a close, not an open.
+**Pop-up attachment:** `attachment` is `{ src }`, an image shown above the title.
 
-**Colour picker:** the palette is the iOS system set plus black and white, 16 swatches. There is no free-form colour input.
+**Contact selector:** lists the player's contacts. `onSelect` receives the same object the Promise resolves to.
 
-**Gallery:** `includeImages` and `includeVideos` default to `true`, `multiSelect` to `false`.
+**Emoji picker:** pass an object. `setEmojiPickerVisible({ onSelect })` opens it, `setEmojiPickerVisible({ visible: false })` closes it. An empty object or a bare boolean is read as a close, not an open. `onSelect` receives `{ emoji }`. The picker offers a fixed set of 24 emoji.
 
-**saveToGallery:** goes through the same route as the Lua `SaveToGallery` export. There is no separate "add to gallery" path.
+**Colour picker:** the palette is the iOS system set plus black and white, 16 swatches. There is no free-form colour input. `onSelect` receives the colour; `onClose` is accepted but never called, so read the `null` of the Promise to detect a dismissal.
+
+**Gallery:** `includeImages` and `includeVideos` default to `true`, `multiSelect` to `false`. `onSelect` receives the same value the Promise resolves to.
+
+**saveToGallery:** goes through the same route as the Lua `SaveToGallery` export, with the same rules (an `https://` address on a host of `Config.Gallery.Import.AllowedHosts`). There is no separate "add to gallery" path.
+
+**createCall:** places a call from the player to `number`, audio or video (`videoCall: true`). `hideNumber` is accepted but ignored: whether the number is withheld follows the player's own "hidden number" setting.
 
 {% hint style="warning" %}
 **Functions do not cross `postMessage`.** The bridge stores each callback under a token (`{ __nashFn: 'fnN' }`), sends only the token, and replays your function when the player acts. This is transparent as long as your callbacks are declared in the object you pass. It also means a callback stays alive in your page: do not rely on it being garbage-collected when the sheet closes.
@@ -344,7 +381,7 @@ You do not need this if you use `nash-bridge.js`. It is here for anyone writing 
 | `{ source: 'nash-phone', type: 'component-result', id, result }` | The component identified by `id` closed |
 | `{ source: 'nash-phone', type: 'invoke', fn, args }` | Replay one of your callbacks, by token |
 
-Nothing is pushed before the `ready` handshake: a message sent before your app listens would be lost.
+`context` and `settings` wait for the `ready` handshake. `nui-event` relays do not: they are posted as soon as they arrive, so one sent before your page listens is lost.
 
 The iframe runs with `sandbox="allow-scripts allow-same-origin allow-forms allow-popups"`. `allow-same-origin` is required: without it your page could not call its own NUI callbacks, which are requests to its own origin.
 
@@ -352,7 +389,7 @@ The iframe runs with `sandbox="allow-scripts allow-same-origin allow-forms allow
 
 Field and function names are deliberately those of LB Phone: an app written for LB Phone declares itself here without a single change to its table or to its interface code.
 
-The only obstacle is the resource name hardcoded in its Lua.
+The main obstacle is the resource name hardcoded in its Lua. Check its `defaultApp` as well: an app that sets it to `false` expects to be downloaded from an App Store, and gets no icon here (see the warning under [Declaration fields](#declaration-fields)).
 
 - **If you can open its files:** replace that string with `nash_phone`. One line.
 - **If it is escrowed:** use the `nash_lbcompat` resource, delivered separately. It answers to the expected name and forwards the calls. Read its `README.md` first: it has to be renamed, and it must never run alongside the original resource.
@@ -363,10 +400,9 @@ An app is only as portable as the exports it uses. Those actually wired are list
 
 | Symptom | Check |
 |---|---|
-| Icon never appears | Set `Config.CustomAppsSettings.debug = true`. No "ajout" line means the declaration was refused: the reason is on the console line above |
+| Icon never appears | Check `defaultApp`: with `false` the icon is never placed. Then set `Config.CustomAppsSettings.debug = true`: no "ajout" line in the F8 console means the declaration was refused, and the reason is on the console line above |
 | Icon appears, page is blank | `ui` does not start with your resource name, or the file is missing from `files{}` in your `fxmanifest.lua` |
-| Blank in the browser demo build | Expected. `nui://` does not exist in a browser; the phone shows an explanatory message instead of an empty frame |
-| `fetchNui` rejects with "contexte pas encore reçu" | You called it before the `ready` handshake completed. Call it from your mount code, not at script top level |
+| `fetchNui` rejects with "contexte pas encore reçu" | You called it before the phone's context reached the page. Pass your resource name as the third argument of `fetchNui`, or call it later |
 | A component resolves instantly with `null` | It is not wired yet. Its name is in the console warning |
 | Icon stays after you stop your resource | Should not happen: the phone removes it on `onClientResourceStop`. If it persists, the app was declared by `nash_phone` itself through `Config.CustomApps` |
 

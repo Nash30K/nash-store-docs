@@ -10,10 +10,10 @@ empty library that points back at the configuration.
 - Everything happens in `config/music.lua`
 
 {% hint style="info" %}
-**Why an external address is required.** The phone cannot play an audio file by itself: its
-interface runs in the FiveM CEF browser, which has no network access. Sound goes through
-`xsound`, as **proximity audio:** players around you hear what you are listening to, like a
-real phone speaker.
+**Why an external address is required.** The phone does not play audio by itself, and no music
+file ships with it. Sound goes through `xsound`, which plays the address you give it as
+**proximity audio:** players around you hear what you are listening to, like a real phone
+speaker.
 
 Without `xsound` started, the phone says so and does not pretend to play anything. The rest of
 the phone works normally.
@@ -76,8 +76,9 @@ The library is read once at startup and cached, so a change needs a restart.
 The server filters the list before the app ever sees it, so that a player can never tap a
 track that will not play. A track is dropped when:
 
+- it has **no `id`**, or an `id` that is not a number;
 - it has **no `url`**;
-- its address does not start with `http://` or `https://`;
+- its address does not start with `http://` or `https://` followed by a host name;
 - its address is longer than **512 characters**;
 - its `id` is a **duplicate** of an earlier track: the first one wins, the second is ignored.
 
@@ -137,21 +138,9 @@ exist, the server prints a yellow warning at startup and nobody can pair earbuds
 
 1. `restart nash_phone`, then open Music in game.
 2. Your tracks are listed. If the library still shows the empty screen, either every track was
-   filtered out or `Config.Music.tracks` was overwritten by another edit.
+   filtered out (see [Why a track does not appear](#why-a-track-does-not-appear)) or
+   `Config.Music.tracks` was overwritten by another edit.
 3. Press play and walk away: the sound follows you and fades past `distance` metres. Another
    player standing next to you hears it too: that is proximity audio working.
-4. With `Config.Debug = true` in `config/main.lua`, run `/phoneconfig`. It prints the declared
-   versus the playable count, which answers the "why is my track missing" question directly:
-
-    ```
-    Musique             12 titres jouables sur 14 declares, 2 listes de lecture
-      -> 2 titre(s) ecarte(s) : adresse absente, non http(s), ou id en double.
-    ```
-
-5. `/phonecheck` flags the overwritten audio block explicitly:
-
-    ```
-    reglages audio de Config.Music perdus : config/music.lua ecrase config/main.lua.
-    ```
-
-6. `/phonedeps` tells you whether `xsound` is actually started.
+4. If pressing play shows "Can't play: the server's audio module (xsound) is not running.",
+   `xsound` is not started on the server: check your `server.cfg`.

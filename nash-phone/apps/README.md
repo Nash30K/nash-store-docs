@@ -1,6 +1,6 @@
 # Application Catalogue
 
-NASH Phone ships 32 applications, plus any custom app you add yourself. This page lists every one of them, states whether it is backed by the server and the database or whether it is a visual mockup, and names what has to be configured before it is of any use on your server.
+NASH Phone ships 33 applications, plus any custom app you add yourself. This page lists every one of them, states whether it is backed by the server and the database or whether it is a visual mockup, and names what has to be configured before it is of any use on your server.
 
 {% hint style="warning" %}
 Some stock apps are decorative on purpose and will never do anything: **Browser** (`safari`), **Weather** (`weather`), **Health** (`health`), **Stocks** (`stocks`), and the "Lives" tab of **TickTok**. **PlayTube** has a real account system, but its videos, channels, comments and private messages never leave the player's own phone. The full recap is in [Decorative apps](#decorative-apps-on-purpose) at the bottom of this page. Read it before you promise anything to your players.
@@ -12,7 +12,7 @@ Every table on this page uses the same four statuses.
 
 | Status | Meaning |
 | ------ | ------- |
-| **Networked** | Backed by `server/apps/*.lua` and the database. Content crosses from one player's phone to another and survives a server restart. |
+| **Networked** | Backed by the server and the database. Content crosses from one player's phone to another and survives a server restart. |
 | **Personal** | Fully functional, but private to the player. Nothing crosses between players. The "Stored in" column says whether the state is saved server-side per character or only in the phone's local storage. |
 | **Live game data** | Reads the running game (position, heading, in-game time). No database, nothing shared, nothing to configure beyond the values already in `config/`. |
 | **Mockup** | Fixed or locally generated content. Nothing a player does inside it reaches another player, and most of it resets when the phone reloads. |
@@ -37,24 +37,24 @@ An app you leave out of the table keeps its original values, so you can delete t
 | ----- | ---- |
 | Dock (always in reach) | `phone`, `messages`, `camera`, `wallet` |
 | Preinstalled on the home screen | `contacts`, `gallery`, `mail`, `notes`, `maps`, `weather`, `clock`, `calendar`, `facetime`, `music`, `safari`, `health`, `reminders`, `passwords`, `services`, `appstore`, `settings` |
-| App Store download (`store = true`) | `calculator`, `compass`, `stocks`, `snake`, `tictactoe`, `ticktok`, `instapic`, `playtube`, `snapz`, `chatapp`, `birdby` |
+| App Store download (`store = true`) | `calculator`, `compass`, `stocks`, `snake`, `tictactoe`, `ticktok`, `instapic`, `playtube`, `snapz`, `chatapp`, `birdby`, `cindr` |
 
 {% hint style="danger" %}
 Disabling `appstore` makes every app marked `store = true` unreachable for the player: the App Store is the only in-phone install path. The apps are not deleted, they simply cannot be installed any more. The only way back in is the client export `exports.nash_phone:SetAppInstalled(app, true)` called from another resource.
 {% endhint %}
 
-Two more apps carry the same kind of weight. Disabling `phone` removes calls and the call log; disabling `messages` removes SMS, and other scripts can still send them but the player will never see them. Disabling `settings` leaves the player unable to change wallpaper, ringtone, language or account.
+Three more apps carry the same kind of weight, and the server prints a yellow warning at boot when one of these four is turned off. Disabling `phone` removes calls and the call log; disabling `messages` removes SMS, and other scripts can still send them but the player will never see them. Disabling `settings` leaves the player unable to change wallpaper, ringtone, language or account.
 
 ## Communication
 
-| App | `id` | Status | Stored in | Server file |
-| --- | ---- | ------ | --------- | ----------- |
-| Phone | `phone` | Networked | `nash_phone_calls` | `server/apps/phone.lua` |
-| Messages | `messages` | Networked | `nash_phone_messages` | `server/apps/messages.lua` |
-| Contacts | `contacts` | Personal (server) | `nash_phone_contacts`, `nash_phone_appdata` | `server/apps/contacts.lua` |
-| Mail | `mail` | Networked | `nash_phone_mails`, `nash_phone_mail_accounts` | `server/apps/mail.lua` |
-| VideoCall | `facetime` | Networked | `nash_phone_calls` | `server/apps/phone.lua`, `server/apps/webrtc.lua` |
-| Services | `services` | Networked | `nash_phone_service_requests` | `server/apps/services.lua` |
+| App | `id` | Status | Stored in |
+| --- | ---- | ------ | --------- |
+| Phone | `phone` | Networked | `nash_phone_calls` |
+| Messages | `messages` | Networked | `nash_phone_messages` |
+| Contacts | `contacts` | Personal (server) | `nash_phone_contacts`, `nash_phone_appdata` |
+| Mail | `mail` | Networked | `nash_phone_mails`, `nash_phone_mail_accounts` |
+| VideoCall | `facetime` | Networked | `nash_phone_calls` |
+| Services | `services` | Networked | `nash_phone_service_requests` |
 
 <details>
 
@@ -64,11 +64,11 @@ Keypad, favourites, recents and a contacts tab. Places real calls to another pla
 
 **Real.** Call signalling is authoritative and lives in server memory; every finished or missed call is written to `nash_phone_calls` with an `app_id` column. The Phone app shows **every** call whatever app placed it, and labels the origin on the line, the way a FaceTime call also appears in Phone on iOS. VideoCall and ChatApp filter the same log down to their own `app_id`.
 
-**Voice.** Each call gets a dedicated voice channel (channel numbers start at 50000, above the usual radio range) driven through `Config.Voice.provider` in `config/main.lua`, `'pma-voice'` by default. Without a voice resource running, the call screen still works and the log is still written, but nobody hears anybody.
+**Voice.** Each call gets a dedicated voice channel (channel numbers start at 50000, above the usual radio range), set through **pma-voice**. `Config.Voice.provider` in `config/main.lua` ships as `'pma-voice'`; pma-voice is the only voice resource the phone drives, so any other value, or pma-voice not running, leaves calls silent: the call screen still works and the log is still written, but nobody hears anybody.
 
-**Conference.** A call keeps its original pair and accepts guests. There is no host: anybody can invite, anybody can leave, and the call ends when one person is left. Hard cap of **4 participants** including guests (`MAX_PARTS`), because video travels as a full mesh: at four, each player already holds three connections and sends three copies of their stream.
+**Conference.** A call keeps its original pair and accepts guests. There is no host: anybody can invite, anybody can leave, and the call ends when one person is left. Hard cap of **4 participants** including guests, because video travels as a full mesh: at four, each player already holds three connections and sends three copies of their stream.
 
-**Speaker.** The speaker button pulls the people *around* the player into the conversation, in both directions, as a real speakerphone would. Configured in `Config.Voice.Speaker` (`config/main.lua`): `enabled = true`, `distance = 8.0` metres, `refreshSeconds = 2`. Bystanders get no on-screen indication that they are being heard, which is the point. A player already in a call is never pulled into someone else's speaker.
+**Speaker.** The speaker button pulls the people *around* the player into the conversation, in both directions, as a real speakerphone would. Configured in `Config.Voice.Speaker` (`config/main.lua`): `enabled = true` (`false` greys the button out), `distance = 8.0` metres, `refreshSeconds = 2`, `maxListeners = 8` (the closest ones are kept). Bystanders get no on-screen indication that they are being heard, which is the point. A player already in a call is never pulled into someone else's speaker.
 
 **Limits.** An unanswered call is marked missed after 30 seconds. Calls are not persisted as sessions: a server restart ends every call in progress.
 
@@ -126,7 +126,7 @@ A real mailbox: inbox, sent, archive, compose, and mail that actually travels fr
 
 Video calls between players. Same call system as the Phone app, flagged as video.
 
-**Real.** The picture is the caller's **game view**, not a webcam: the game render is painted into a canvas by the CEF game-view plugin, turned into a stream, and sent peer to peer. Your server never sees a frame; it only relays the handshake (`server/apps/webrtc.lua`).
+**Real.** The picture is the caller's **game view**, not a webcam: the game render is painted into a canvas by the CEF game-view plugin, turned into a stream, and sent peer to peer, or through a TURN relay when no direct route exists. Your server never sees a frame; it only relays the handshake.
 
 **Configuration** in `Config.VideoCall` (`config/main.lua`):
 
@@ -135,13 +135,15 @@ Video calls between players. Same call system as the Phone app, flagged as video
 | `enabled` | `true` | `false` keeps calls audio-only, with no picture |
 | `longEdgePx` | `640` | long edge of the transmitted stream |
 | `fps` | `24` | frames per second sent |
-| `framing` | `0.35` | where to aim in the game image in selfie mode; lower it if your correspondent sees you too far right |
+| `framing` | `0.35` | where to aim in the game image in selfie mode; lower it if your correspondent sees you cut off on the left, raise it if they see you too far to the right |
 | `debug` | `false` | writes the whole call sequence to the player's F8 console |
-| `iceServers` | Google STUN | STUN and, optionally, TURN |
+| `iceServers` | Google STUN | STUN and, optionally, your own TURN server |
 
-{% hint style="info" %}
-Without a TURN server, players behind CGNAT, some 4G boxes and corporate networks get the **audio but no picture**. The rest of the call works normally. A commented TURN block is provided in `config/main.lua`; keep UDP, TCP and TLS entries, they pass the most firewalls.
+{% hint style="warning" %}
+Without a TURN relay, players behind a 4G box, CGNAT, strict NAT or a VPN get the **audio but no picture**. The rest of the call works normally. On a public server, fill in [`config/turn.lua`](../config/config-turn.md) (free Cloudflare account). A commented block in `config/main.lua` also takes your own TURN server. See [Video calls and live streams](../guides/setup-video-calls.md).
 {% endhint %}
+
+When no route is found after two attempts, the call screen says the picture is unavailable and that the call continues with audio. Minimizing a video call stops the player's camera, so the other side sees a black picture until the call is brought back.
 
 </details>
 
@@ -158,15 +160,17 @@ Citizens contact the police, EMS, a mechanic or a taxi; employees of those jobs 
 | Key | Default | Meaning |
 | --- | ------- | ------- |
 | `enabled` | `true` | master switch |
-| `requestTimeout` | `15` | minutes before an unanswered request expires |
-| `historyKeep` | `25` | requests kept in a company's "recent requests" log |
-| `cooldown` | `20` | seconds between two requests from the same player, `0` disables |
+| `requestTimeout` | `15` | read but **not applied in the current version**: an unanswered request stays pending until an employee takes or closes it |
+| `historyKeep` | `25` | how many recent requests an employee sees in the company's list (older rows are not deleted) |
+| `cooldown` | `20` | seconds between two requests from the same character, `0` disables |
 | `ownDuty` | `true` | the app's own duty switch is the truth. `false` hides the switch and waits for another script to call `exports.nash_phone:SetServiceDuty(source, on, receive)` |
 
-Per company: `job` (must match your framework's job name exactly), `label`, `place`, `icon` (a PNG dropped in the resource's `service_icons/` folder, nothing to rebuild), `accent`, `canCall`, `canMessage`, `multiResponders`, `shareLocation`.
+Per company: `job` (must match your framework's job name exactly), `label`, `place`, `icon` (the file name of a PNG placed in the resource's `service_icons/` folder), `accent`, `canCall`, `canMessage`, `multiResponders`, `shareLocation`.
+
+**Icons.** `service_icons/` ships without images, so the four shipped services (`police.png`, `ambulance.png`, ...) show their initial on a badge of their `accent` colour until you add the files. Nothing breaks without them. Use a square PNG, and restart the resource after adding one.
 
 {% hint style="warning" %}
-With `ownDuty = false` and nothing calling `SetServiceDuty`, **every service stays "Unavailable"**. That is not a bug: no employee has ever been declared on duty. `exports.nash_phone:GetServiceOnDuty(job)` reads the current list back.
+With `ownDuty = false` and nothing calling `SetServiceDuty`, **every service stays "Unavailable"**. That is not a bug: no employee has ever been declared on duty. `exports.nash_phone:GetServiceOnDuty(job)` returns how many employees of that job are on duty and receiving requests right now.
 {% endhint %}
 
 A company absent from `list` does not exist in the app, and a player holding that job will not see a "My service" page either.
@@ -175,13 +179,13 @@ A company absent from `list` does not exist in the app, and a player holding tha
 
 ## Social apps
 
-The six social apps share one foundation, so read this before the per-app blocks.
+The seven social apps share one foundation, so read this before the per-app blocks.
 
 **Accounts are real.** Every social app has its own account table row in `nash_phone_social_accounts`, with a salted SHA-256 password (hashed by MySQL, no Lua crypto dependency). Sign-up, sign-in and password reset by verification code all work. Sign-in on one app has no effect on another.
 
-**There is no account directory, and there must never be one.** No endpoint lists accounts. You search for a username (minimum 3 characters, maximum 10 results, private accounts excluded) or you do not find anybody. On a 64-slot server, a browsable list would be the full roster of who is playing and how many, which is metagaming served on a plate. ChatApp is the exception, and it works the other way round: it has no search at all, its conversation list is deduced from the phone's address book.
+**There is no account directory, and there must never be one.** No endpoint lists accounts. In Snapz, InstaPic, BirdBy and TickTok you search for a username (minimum 3 characters, maximum 10 results, private accounts excluded) or you do not find anybody. On a 64-slot server, a browsable list would be the full roster of who is playing and how many, which is metagaming served on a plate. ChatApp is the exception, and it works the other way round: it has no search at all, its conversation list is deduced from the phone's address book. Cindr has no search either: people only meet through its deck of profiles.
 
-**Addressing.** ChatApp addresses people by phone **number**, like WhatsApp. Snapz, InstaPic, BirdBy and TickTok address by **username**.
+**Addressing.** ChatApp addresses people by phone **number**, like WhatsApp. Snapz, InstaPic, BirdBy, TickTok and Cindr address by **username**.
 
 **Shared tables.** Posts, likes, comments, follows and in-app notifications live in one generic set of tables carrying an `app_id` column: `nash_phone_social_posts`, `_likes`, `_comments`, `_follows`, `_notifs`. Private messages live in `nash_phone_social_messages`, stories in `nash_phone_social_stories` and `nash_phone_social_story_views`.
 
@@ -197,6 +201,7 @@ The six social apps share one foundation, so read this before the per-app blocks
 | BirdBy | `birdby` | Real | Real, by username | none | Replies and follows real |
 | TickTok | `ticktok` | Real | Real, by username | none | "Lives" tab is a **mockup** |
 | PlayTube | `playtube` | **Mockup** | **Mockup** | none | Real account, real YouTube link player |
+| Cindr | `cindr` | Deck of profiles instead of a feed | Real, by username, **between matches only** | none | Real likes, matches and reports |
 
 Shared server limits, enforced server-side: post body 500 characters, place 140, comment 500, feed page 20; private message body 1000 characters, page 40; story text 280 characters, visible for 24 hours, **40 live stories maximum per account**, 60 authors and 600 rows scanned per carousel read.
 
@@ -228,7 +233,7 @@ Photo network: feed, stories, direct messages, activity, profiles, and live broa
 
 ### Live broadcasts
 
-A live broadcasts the host's **real game view** to viewers. It is the same transport as a video call: the picture is painted into a canvas, turned into a stream, and sent directly from player to player. **The image never passes through your server**, which only relays the handshake.
+A live broadcasts the host's **real game view** to viewers, with the microphone of the host and of the guests on screen. It is the same transport as a video call: the picture is painted into a canvas, turned into a stream, and sent directly from player to player. **Picture and sound never pass through your server**, which only relays the handshake.
 
 Configured in `Config.Social.Live` (`config/social.lua`):
 
@@ -236,17 +241,24 @@ Configured in `Config.Social.Live` (`config/social.lua`):
 | --- | ------- | ------- |
 | `enabled` | `true` | `false` keeps the button visible but the server refuses to start a broadcast, and the app shows a clear refusal instead of a dead button |
 | `maxViewers` | `8` | viewers per live, clamped server-side to 1..24 |
-| `defaultAudience` | `'followers'` | who gets notified at launch: `'everyone'`, `'followers'` or `'none'`. The host can change it at launch time |
+| `audience` | `'followers'` | who gets notified when a live starts: `'everyone'`, `'followers'` or `'none'`. It applies to every live on the server; the host does not pick it. Whatever you choose, **only followers of the host can watch** |
+| `microphone` | `true` | viewers hear the host and the guests on screen. `false` gives silent lives, with no mic button |
+
+The older key name `defaultAudience` is still read when `audience` is absent; when both are filled with different values, `audience` wins and the console says so.
 
 {% hint style="warning" %}
 `maxViewers` is a physical limit, not a comfort setting. With no media server, the host sends a **separate stream to every viewer**: their upload and CPU cost rise proportionally. At 8, a player on fibre holds up. Past a dozen, the broadcast degrades for everyone already watching, and the host loses frames in their own game. Raising the number does not fit more people in, it splits the same capacity across more of them.
 {% endhint %}
 
-Other fixed limits: the host plus **3 guests** may broadcast; title 60 characters; comment 200 characters; the last 60 chat lines are kept for late arrivals. The list of active lives only returns broadcasts from accounts the requester already follows, plus their own.
+Other fixed limits: the host plus **3 guests** may broadcast (the host invites viewers on screen); comment 200 characters, at most 5 comments per 5 seconds per viewer; the last 60 chat lines are kept for late arrivals; one live start per minute per player, and none while the player is in a call. The list of active lives only returns broadcasts from accounts the requester already follows, plus their own.
+
+**Sound.** Only the microphone of the host and the guests is sent; a viewer's microphone is never captured. The game's own audio never is either: the embedded browser never receives GTA's audio mix. The sound travels with the picture, not through `pma-voice`, and plays at the phone's volume. The host and the guests have a mic button next to the camera flip button to mute and unmute. When the microphone is refused, missing or has not answered after 5 seconds, the live goes on with picture only and the button turns into a red crossed-out mic that asks again when clicked. During a phone call, the host and the guests stop sending, and a viewer stops hearing the live, until they hang up.
+
+With `Config.VideoCall.enabled = false`, lives still run but **without picture or sound** (comments and viewers only), and the console warns about it at startup.
 
 **No SQL table, on purpose.** A live only makes sense while its host is connected. An interrupted live is a finished live; nothing is restored after a restart. Launch notifications stay *inside* the phone and never draw over the game screen, unlike an incoming call.
 
-Lives use `Config.VideoCall.iceServers`, so the TURN caveat from VideoCall applies here too.
+Lives use the same STUN and TURN servers as VideoCall (`Config.VideoCall.iceServers` and `config/turn.lua`), so the TURN caveat applies here too.
 
 </details>
 
@@ -342,13 +354,31 @@ This is the app most likely to generate a ticket. If your server advertises "a w
 
 </details>
 
+<details>
+
+<summary>Cindr</summary>
+
+Dating app: a deck of profiles to swipe, matches, chats and the player's own profile.
+
+**Real, all of it.** Profiles, likes, super likes, matches, chats and reports are server-backed, in four tables: `nash_phone_dating_profiles`, `_swipes`, `_matches` and `_reports`. The account itself is a social account like the other apps (sign-up, sign-in, reset by code).
+
+**The profile.** A display name, a declared age, a gender, who the player is looking for and in which age range, a bio, up to 5 interests and up to 6 photos (from the camera roll, or added by link, which needs the image host). A switch hides the profile from every deck. Sharing the neighbourhood is off until the player turns it on: the card then shows the game's name for the area where the player stood when they saved their profile, never a position.
+
+**Matching.** The deck only offers profiles whose age and search settings fit both sides, and profiles that already liked the player come first. Two likes make a match: the other player gets a banner, and only then can the two write to each other. The last choice can be undone for a few minutes, unless it already made a match. Unmatching deletes the conversation on both sides.
+
+**Reports.** A player can report a profile (fake profile, offensive content, spam, underage, other reason). Each report is stored, printed in the server console and sent to the `cindr_report` log (see [config/logs.lua](../config/config-logs.md)). Nothing is sanctioned automatically: your staff decides.
+
+**Configuration** in `Config.Social.Dating` (`config/social.lua`): `enabled = true` (`false` makes the app refuse everything while keeping profiles), `deckSize = 12`, `minAge = 18` (never lower than 18), `maxAge = 99`, `maxPhotos = 6`, `shareZone = true` (`false` hides every neighbourhood), `undoSeconds = 300`, `reports = true`. To remove the app from the phone, use `cindr = { enabled = false }` in `config/apps.lua`. Details in [config/social.lua](../config/config-social.md).
+
+</details>
+
 ## Media and capture
 
-| App | `id` | Status | Stored in | Server file |
-| --- | ---- | ------ | --------- | ----------- |
-| Camera | `camera` | Networked | `nash_phone_gallery` | `server/apps/gallery.lua`, `server/services/upload.lua` |
-| Photos | `gallery` | Personal (server) | `nash_phone_gallery` | `server/apps/gallery.lua` |
-| Music | `music` | Networked (proximity audio) | none | `server/apps/music.lua` |
+| App | `id` | Status | Stored in |
+| --- | ---- | ------ | --------- |
+| Camera | `camera` | Networked | `nash_phone_gallery` |
+| Photos | `gallery` | Personal (server) | `nash_phone_gallery` |
+| Music | `music` | Networked (proximity audio) | none |
 
 <details>
 
@@ -388,7 +418,7 @@ Only `fivemanage` is supported as a provider. Discord webhooks are deliberately 
 
 <summary>Photos (`gallery`)</summary>
 
-Camera roll: grid, full-screen viewer, video playback, favourites, deletion, a share sheet, adding a picture from a link, and copying the link of a photo or video.
+Camera roll: grid, full-screen viewer, video playback, favourites, deletion, a share sheet, adding a picture from a link, copying the link of a photo or video, and using a photo as wallpaper.
 
 **Real, private per character.** Rows live in `nash_phone_gallery`. Every media carries a full-resolution `url` and a smaller `thumb`, a second file made when the media is saved. Serving full-resolution images in a 120 px grid is what makes an embedded browser that shares memory with the game fall over after thirty photos.
 
@@ -408,11 +438,19 @@ The picture is **re-hosted, never linked**. The player's own game downloads it, 
 - **A link that is already on Fivemanage is re-hosted too.** Fivemanage serves the files of every account from the same addresses, so the phone cannot tell your files from another server's. Re-hosting every picture is what guarantees that it is reduced, cleaned of its metadata, and stored on your own account.
 - **`http://` links** are fetched in `https`: the phone's page runs in `https`, and the game blocks a plain `http` download from it. Almost every image host serves both.
 
-An import uses the same host and the same quotas as the Camera: up to two uploads (the picture and its thumbnail) out of the 12 per minute each player is allowed. Without an image host the **+** button does not appear at all, and `Config.Gallery.Import.Enabled = false` removes it on purpose. Every key is described in [config/main.lua](../config/config-main.md#adding-photos-by-link). When a link cannot be added, the alert names the reason; the full list is in [Common Errors](../common-errors.md#adding-a-photo-by-link-fails).
+An import uses the same host and the same quota as the Camera: each player may make 24 upload requests per minute, and an import uses up to two of them (the picture and its thumbnail), like a camera photo. Without an image host the **+** button does not appear at all, and `Config.Gallery.Import.Enabled = false` removes it on purpose. Every key is described in [config/main.lua](../config/config-main.md#adding-photos-by-link). When a link cannot be added, the alert names the reason; the full list is in [Common Errors](../common-errors.md#adding-a-photo-by-link-fails).
 
 ### Recently Saved
 
 A collection in the Albums tab that gathers what came from outside the camera: photos added from a link, and photos and videos received over AirDrop. Pictures taken with the Camera do not appear in it.
+
+### Use as Wallpaper
+
+**Use as Wallpaper**, in the share sheet of a photo, opens it in the lock screen editor. The player drags to frame it, zooms with the mouse wheel (up to 4x), then taps **Add**. The same photo and framing are shown on the lock screen and the home screen, and the clock style can be changed in the same editor. The entry is not offered on videos. The same editor is reachable from Settings and from the lock screen (see [Settings](#system)).
+
+- **Only the player's own photos.** The phone sends the photo's id and the framing, never an address. The server reads the address from the player's own camera roll, so a modified client cannot use another player's photo (`not_found`) or a video (`not_photo`).
+- **Deleting the photo keeps the wallpaper.** The server stores its own copy of the address, and deleting a photo never deletes the hosted file. The player can still reframe it from the lock screen.
+- **A dead link falls back to the default Amber gradient**, never to a black screen, on the lock screen, the home screen and in Settings. This happens when the file is removed from Fivemanage or by a retention policy (see [How long links last](../installation/image-hosting.md#how-long-links-last)). The phone tries the link again when it is opened, and the photo comes back on its own if it loads.
 
 ### Copy the link, and Duplicate
 
@@ -447,6 +485,8 @@ Library, playlists, favourites, player, and playback of a pasted link.
 
 - `tracks`: `id` (unique and stable, it is what player favourites reference, renumbering moves everybody's favourites), `title`, `artist`, `album`, `duration` in seconds, `url`, optional `grad` (two CSS colours for the cover).
 - `playlists`: `name`, a list of track `id`s, optional `grad`. A playlist referencing only missing tracks is not displayed rather than shown empty.
+
+The audio settings (`distance = 12.0` metres, `defaultVolume = 0.4`, `maxVolume = 1.0`, `stopOnDeath = true`) are in the `Config.Music` block of `config/main.lua`; `config/music.lua` only adds `tracks` and `playlists` to that table.
 
 A track without a URL is not displayed, and neither is one whose URL does not start with `http://` or `https://` or exceeds 512 characters. The goal is that a player can never tap a track that will not play: a missing track is almost always a mistyped address.
 
@@ -488,7 +528,7 @@ Using the item once pairs it; using it again connects and disconnects it, like a
 
 <summary>Notes, Reminders, Calendar</summary>
 
-Three apps with no sharing at all, saved server-side per character as one JSON block per player and per app in `nash_phone_appdata` (`server/apps/appdata.lua`).
+Three apps with no sharing at all, saved server-side per character as one JSON block per player and per app in `nash_phone_appdata`.
 
 **Real and persistent.** They used to live only in the client cache, which belongs to the FiveM client and not to the character: a player clearing their cache or moving to another computer lost everything. They now follow the character.
 
@@ -497,7 +537,7 @@ Three apps with no sharing at all, saved server-side per character as one JSON b
 - Each block is capped at **256 KB of JSON**. A note is a few hundred bytes, so a thousand notes fit; the cap exists because the payload comes from the NUI and a modified client could otherwise write a huge block on every keystroke.
 - Only whitelisted app keys are accepted: `notes`, `calendar`, `reminders`, `contacts`. Anything else is refused.
 - Writes are debounced by 700 ms and **never sent before a load has succeeded**. If the load fails, the app stays read-only until the next open. That is deliberate: better not to save than to overwrite a player's content with nothing.
-- In game these three apps start **empty**. The demo notes, events and lists are only seeded in the web demo build.
+- In game these three apps start **empty**. The sample notes, events and lists seen in the online demo are not shipped.
 
 </details>
 
@@ -592,7 +632,7 @@ Do not change the bounds. They match the grid of Rockstar's tiles, one and a hal
 
 The one configurable part is the first bookmark and the first "frequently visited" row, which come from `Config.Brand.site` in `config/main.lua`: `label` (short name under the icon), `url` (displayed address, no navigation happens) and `title`, a value per language keyed by language code.
 
-The app id, component and CSS classes still contain the word `safari`. They are identifiers; renaming them would break the home screen, the dock and the catalogue.
+The app id is still `safari` (it is the key in `config/apps.lua`). It is an identifier, not a name players see: rename the app with `name` instead.
 
 </details>
 
@@ -602,18 +642,18 @@ The app id, component and CSS classes still contain the word `safari`. They are 
 
 Two real, playable games with no server side. Snake speeds up as the score climbs. Tic-Tac-Toe plays against an AI that blocks and punishes mistakes, or two players on the same phone. Nothing is stored, nothing is shared, no leaderboards.
 
-Both are App Store downloads by default and are filed under the Games category, credited to `<Config.Brand.studio> Arcade`.
+Both are App Store downloads by default and are filed under the Games category. Like every app in the store, they are credited to `Config.Brand.studio` (`'Nash Store'` by default).
 
 </details>
 
 ## System
 
-| App | `id` | Status | Stored in | Server file |
-| --- | ---- | ------ | --------- | ----------- |
-| Settings | `settings` | Personal (server) | `nash_phone_settings` | `server/apps/settings.lua` |
-| App Store | `appstore` | Personal (server) | `nash_phone_home` | `server/apps/home.lua` |
-| Wallet | `wallet` | Networked | `nash_phone_bank` + framework accounts | `server/apps/bank.lua` |
-| Passwords | `passwords` | Personal (local + cloud backup) | phone local storage, `nash_phone_icloud_backup` | `server/apps/icloud.lua` |
+| App | `id` | Status | Stored in |
+| --- | ---- | ------ | --------- |
+| Settings | `settings` | Personal (server) | `nash_phone_settings` |
+| App Store | `appstore` | Personal (server) | `nash_phone_home` |
+| Wallet | `wallet` | Networked | `nash_phone_bank` + framework accounts |
+| Passwords | `passwords` | Personal (local + cloud backup) | phone local storage, `nash_phone_icloud_backup` |
 
 <details>
 
@@ -623,23 +663,31 @@ The phone's own settings: profile, wallpaper and lock screen customisation, ring
 
 **Real.** Everything is persisted per character in `nash_phone_settings` as a JSON block, cached server-side with idle eviction.
 
+**Wallpaper.** One wallpaper is used on both the lock screen and the home screen: a built-in one, or one of the player's own photos. A photo can be picked from three places, all leading to the same editor (drag to frame, mouse wheel to zoom):
+
+- **Settings > Wallpaper > Choose from Photos**, which opens a picker of the player's photos (videos are left out). It loads the 120 most recent items of the camera roll; an older photo can still be used from Photos.
+- The **+** button of the wallpaper gallery, opened by a long press on the lock screen. Once a photo is set, it is the first card of that gallery and **Customize** reframes it.
+- **Use as Wallpaper** in the share sheet of Photos (see [Photos](#media-and-capture)).
+
+One photo is remembered per character, and choosing another one replaces it. Picking a built-in wallpaper keeps the photo as a **My Photo** tile in Settings and as the first card of the lock screen gallery, so the player can switch back without framing it again. How the photo is stored is described under `GetSettings` in the [server exports](../developer-api/server-exports.md#settings).
+
 **Language.** `Config.Locale` in `config/main.lua` (shipped `'fr'`) sets both the language of out-of-phone notifications and the starting language of a phone nobody has touched. The player overrides it in Settings > General > Language and keeps their choice. `Config.ExtraLocales` (shipped empty) lists the extra languages offered in that menu, on top of French and English. Any code with a matching `locales/<code>.json` file is accepted; nothing to compile.
 
-**Brand.** `Config.Brand.name` (shipped `'NASH'`) replaces the word NASH everywhere a player sees it: the network operator in Settings > SIM, the account identifier at the top of Settings, the device name in Settings > General > About, the Settings footer, and the sender of social verification SMS.
+**Brand.** `Config.Brand.name` (shipped `'NASH'`) replaces the word NASH everywhere a player sees it: the network operator in Settings > SIM, the account identifier at the top of Settings, the Wi-Fi network name, the device name in Settings > General > About, the Settings footer, the "Data and privacy" screen of the first-run setup, and the sender of a verification code for an app that has no sender name of its own (the six social apps sign their codes with their own name).
 
 **Storage page.** Per-app usage is computed from a real model: photos and videos priced by duration, apps by install size.
 
-**First-run setup** is a separate flow (`config/setup.lua`, `server/apps/setup.lua`), shown once per character the first time they open the phone: greeting, language, country, appearance, byCloud account, identity, privacy, Face ID, passcode. The identity screen only appears when a byCloud account is being created.
+**First-run setup** is a separate flow (configured in `config/setup.lua`), shown once per character the first time they open the phone: greeting, language, country, appearance, byCloud account, identity, privacy, Face ID, passcode. The identity screen only appears when a byCloud account is being created.
 
 Nothing is applied until the end, and the values it collects (language, appearance, Face ID, passcode) are written to `nash_phone_settings`, the same place the lock screen and Settings already read them from; the identity belongs to the byCloud account, not to the setup table. `nash_phone_setup` only remembers **where the player got to**, so somebody who disconnects halfway resumes instead of starting over. Existing characters are marked as already set up and never see it.
 
-Shipped as `Config.Setup.enabled = true` and `skippable = false`. `exports.nash_phone:ResetPhoneSetup(source)` replays it; the `/phonesetupreset` command only exists when `Config.Debug` is on.
+Shipped as `Config.Setup.enabled = true` and `skippable = false`. `exports.nash_phone:ResetPhoneSetup(source)` replays it. With `Config.UseItem = true` and an inventory that gives items a serial number, a character who starts using a different phone item goes through the setup again; messages, contacts and the number stay with the character.
 
 **Face ID recognises one character per phone.** Each phone item has a serial number, and the first character who uses it becomes the face that phone recognises (`nash_phone_faceid`, server side). The server checks it on every scan: a player who carries a phone with their face on it is recognised; a player who only carries somebody else's phone sees the Dynamic Island's refusal animation, then the passcode screen. A character can own several phones: a new phone, received after losing the old one, becomes theirs the first time they use it, whether Face ID is on or off. A phone that changes hands relocks itself on the next opening, so a phone lent unlocked still asks the new holder for Face ID. The camera button, a tapped notification and the Control Center code scanner all go through the same unlock.
 
 What the phone shows is still the data of the character holding it: messages, contacts and settings belong to the character, not to the item. The passcode asked after a refusal is therefore the holder's own. Face ID is a roleplay lock, not a way to read someone else's phone.
 
-It needs `Config.UseItem = true` and an inventory that gives items a serial number (ox_inventory does, and so does qb-inventory on the versions that let a resource write item info). Without one, the server cannot tell two phones apart, and Face ID recognises everybody, as it did before this feature. A server that cannot answer (database down, table missing) also lets the scan succeed: not knowing is never treated as a refusal.
+It needs `Config.UseItem = true` and an inventory that gives items a serial number (ox_inventory and qs-inventory do, and so does qb-inventory on the versions that let a resource write item info). Without one, the server cannot tell two phones apart, and Face ID recognises everybody, as it did before this feature. A server that cannot answer (database down, table missing) also lets the scan succeed: not knowing is never treated as a refusal.
 
 </details>
 
@@ -653,7 +701,9 @@ Browsing, install and uninstall for the apps marked `store = true`, plus a Today
 
 **Generated store pages.** When you push a preinstalled system app into the store (`store = true` on an app that ships preinstalled), it has no hand-written store page. The phone composes one from what it knows: the icon, the translated or overridden name, the studio from `Config.Brand.studio`, and the icon gradient in place of screenshots.
 
-Store listings credit `<Config.Brand.studio> Arcade` for games, `<studio> Labs` and `<studio> Finance` for the utility apps, so setting `studio = 'Vespucci'` gives "Vespucci Arcade".
+Every store listing, stock or generated, names `Config.Brand.studio` as its publisher, as it is, with nothing added (`'Nash Store'` by default). Setting `studio = 'Vespucci'` shows "Vespucci" on every page.
+
+**Custom apps are not listed in the App Store.** The store only lists stock apps. A custom app is either placed on the home screen (`defaultApp = true`) or not reachable at all: see [Custom apps](#custom-apps).
 
 </details>
 
@@ -663,7 +713,7 @@ Store listings credit `<Config.Brand.studio> Arcade` for games, `<studio> Labs` 
 
 Balance, send money, recent activity and a searchable, paged transaction history.
 
-**Real.** Balances are read live from the framework (`bank` and `cash` accounts on ESX, `money.bank` / `money.cash` on QBCore and Qbox). Transfers really debit and credit through the framework; the phone's own `nash_phone_bank` table holds the history, two rows per transfer, one per side.
+**Real.** Balances are read live from the framework (`bank` and `money` accounts on ESX, `money.bank` / `money.cash` on QBCore and Qbox). Transfers really debit and credit through the framework; the phone's own `nash_phone_bank` table holds the history, two rows per transfer, one per side.
 
 **Configuration.** None of its own. It follows `Config.Framework` in `config/bridge.lua` (`'auto'` by default, detection order Qbox, QBCore, ESX).
 
@@ -702,7 +752,7 @@ A Face ID-locked keychain: entries with site, username, password, favourites, se
 
 You can add your own apps in two ways, both documented in `config/custom_apps.lua`.
 
-1. **In the config file**, in `Config.CustomApps`. Simplest, and the app appears on every phone on the server.
+1. **In the config file**, in `Config.CustomApps`. Simplest, and with `defaultApp` left at `true` the app appears on every phone on the server.
 2. **From your own resource**, with the client export, once the player is loaded:
 
 ```lua
@@ -719,24 +769,24 @@ Use the export form when your app has a UI, because its HTML has to live in your
 | ----- | ------- |
 | `identifier` | **Required.** Unique key, never shown to the player |
 | `name` | Display name under the icon |
-| `description`, `developer`, `images`, `size` | Shown on the App Store page. `size` is in KB and purely cosmetic |
-| `icon` | Icon URL. For an image in your resource: `'https://cfx-nui-' .. GetCurrentResourceName() .. '/ui/icon.png'` |
+| `icon` | Icon URL. For an image in your resource: `'https://cfx-nui-' .. GetCurrentResourceName() .. '/ui/icon.png'`. Without it, the icon is the first letter of the name on a coloured background |
 | `ui` | Path to your HTML, **prefixed with your resource name**: `'my-resource/ui/index.html'`. Without it the app only fires `onUse` when tapped |
-| `defaultApp` | `true` (default) = on the home screen at first start. `false` = App Store download |
-| `game` | `true` files it under the App Store's Games category |
+| `defaultApp` | `true` (default) = placed on every player's home screen. `false` = not placed on the home screen, and **removed** from home screens that already show it, unless the player has it installed |
 | `landscape` | `true` displays the app in landscape |
-| `keepOpen` | `true` keeps the phone open when the app is opened. For apps that take over the screen, a camera for instance |
 | `onUse` | Client-side function called when the app opens |
 | `onServerUse` | Server-side function called when the app opens, receives the player's `source` |
+| `description`, `developer`, `images`, `size`, `game`, `price`, `keepOpen` | Accepted so that an LB Phone declaration works unchanged, but **not displayed or used** by the phone: custom apps have no App Store page |
+
+{% hint style="warning" %}
+**Custom apps are not listed in the App Store.** With `defaultApp = false`, a player has no way to find the app in the phone. The only way to give it to someone is the client export `exports.nash_phone:SetAppInstalled('<identifier>', true)`, called from another resource (a shop, an item, a job script): the app is then installed for that character, placed on their home screen, and kept after a reconnect.
+{% endhint %}
 
 **LB Phone compatibility.** The field names above are LB Phone's, deliberately: an app written for LB Phone declares itself here without changing its table. Two things to know before relying on it:
 
 - The app's Lua calls `exports['lb-phone']`. If you can edit the app, replace that string with `exports['nash_phone']` and you are done. If the app is escrowed and cannot be modified, you need the `nash_lbcompat` bridge, shipped separately.
 - An app is only as portable as the exports it uses. Only some of the LB Phone export surface is actually implemented; the rest return neutral values, so the app launches without crashing but without data.
 
-{% hint style="warning" %}
-`price` is accepted in the table and forwarded to the interface for LB Phone compatibility, but **nothing charges for it**. A custom app with a price is still free to install.
-{% endhint %}
+`price` in particular is accepted for LB Phone compatibility, but **nothing charges for it**.
 
 Custom apps are also reachable from `exports.nash_phone:SendCustomAppMessage(src, identifier, data)` on the server side, and the phone hosts their UI in an isolated frame (`custom_app_bridge/nash-bridge.js`).
 
@@ -762,18 +812,19 @@ A checklist of everything that has to be filled in before an app is useful. Anyt
 | App | File | What to do |
 | --- | ---- | ---------- |
 | Camera, Photos, all social apps | `config/upload.lua` | **Mandatory.** A Fivemanage API key. Without it the camera refuses to shoot, no photo can be posted anywhere, and Photos hides its **+** button (add by link) |
-| Photos, add by link | `config/main.lua` | Nothing if you keep the defaults. `Config.Gallery.Import.Enabled = false` turns it off. If your Fivemanage account serves files from a custom domain, add that domain to `Config.Gallery.Import.AllowedHosts` |
+| Camera, Photos (add by link) | `config/main.lua` | Nothing if you keep the defaults. `Config.Gallery.Import.Enabled = false` turns adding by link off. If your Fivemanage account serves files from a custom domain, add that domain to `Config.Gallery.Import.AllowedHosts`: Camera photos and videos are checked against that list too |
 | Music | `config/music.lua` | Fill `tracks` and `playlists`. The library ships empty. Requires `xsound` running |
 | Music, private listening | `config/main.lua` | `Config.Earbuds.itemName`, and create the item in **your** inventory. `sql/item_earbuds.sql` for default ESX |
 | Maps | `config/maps.lua` | World bounds, categories, and the places themselves in game coordinates. Use `/phonepos` in chat to read a position |
-| Services | `config/services.lua` | One entry per company, with the exact framework `job` name, and a PNG in `service_icons/` |
+| Services | `config/services.lua` | One entry per company, with the exact framework `job` name. Optionally a PNG in `service_icons/` (the folder ships without images) |
 | Mail | `config/main.lua` | `Config.Mail.domain`, and decide on `Config.Cloud.crossLogin` |
-| VideoCall, InstaPic Lives | `config/main.lua` | `Config.VideoCall.iceServers`. Add a TURN server if your players sit behind CGNAT |
-| InstaPic Lives | `config/social.lua` | `Config.Social.Live.maxViewers` and `defaultAudience` |
+| VideoCall, InstaPic Lives | `config/turn.lua` | **Recommended on a public server.** A Cloudflare TURN key, so players behind a 4G box, CGNAT, strict NAT or a VPN get the picture. Your own TURN server goes in `Config.VideoCall.iceServers` (`config/main.lua`) instead |
+| InstaPic Lives | `config/social.lua` | `Config.Social.Live.maxViewers`, `audience` and `microphone` |
+| Cindr | `config/social.lua` | `Config.Social.Dating`, in particular `minAge`, `shareZone` and `reports` |
 | Snapz, InstaPic stories | `config/social.lua` | `Config.Social.StoriesAudience` per app |
 | Snapz map | `config/social.lua` | `Config.Social.SnapMap`, in particular `blurMeters` and `requireMutual` |
 | Social notification cleanup | `config/social.lua` | `Config.Social.Notifs`: `purgeOnJoin = 'read'`, `keepReadDays = 2`, `keepDays = 7` |
-| Phone, all calls | `config/main.lua` | `Config.Voice.provider` and `Config.Voice.Speaker`. Requires a voice resource, `pma-voice` by default |
+| Phone, all calls | `config/main.lua` | `Config.Voice.Speaker`, and keep `Config.Voice.provider = 'pma-voice'`. Requires `pma-voice` running: it is the only voice resource the phone drives |
 | Weather, Compass, App Store, InstaPic | `config/settings.lua` | `Config.City.name` and `Config.City.region` |
 | Every app | `config/apps.lua` | `enabled`, `name`, `store` per app |
 | Custom apps | `config/custom_apps.lua` | Or the `AddCustomApp` export from your own resource |

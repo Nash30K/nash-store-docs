@@ -35,7 +35,7 @@ Config.Logs = {
 
 {% hint style="danger" %}
 **This file is server-side only.** It is declared in `server_scripts` in `fxmanifest.lua`, right
-after `config/upload.lua`, and it must stay there. A webhook link is a password: anyone who reads
+after `config/upload.lua` and `config/turn.lua`, and it must stay there. A webhook link is a password: anyone who reads
 it can post anything in your channels. Every shared script is downloaded into the cache of each
 connecting player, so moving this file into `shared_scripts` would hand your webhooks to all of
 them.
@@ -137,7 +137,12 @@ events = {
 | `avatar` | `string` | `https` link to the sender's picture. Default: the picture set on the webhook |
 
 With `admin.service = 'fivemanage'`, `admin = true` or a link both send the admin log to
-Fivemanage only. With `'both'`, it goes to the Discord channel and to Fivemanage.
+Fivemanage only. With `'both'`, it goes to the Discord channel and to Fivemanage. Any other
+`service` value counts as `'discord'`.
+
+A link, here or in `admin.webhook` / `public.webhook`, must be a Discord webhook address
+(`https://discord.com/api/webhooks/...`, `discordapp.com` also accepted). Anything else is
+ignored without a message, as if the field were empty.
 
 ## Embed or plain text
 
@@ -159,8 +164,10 @@ Discord cannot play a video inside an embed.
 2. Paste the link into `admin.webhook` for your staff channel, into `public.webhook`, or directly
    on an event for a dedicated channel.
 3. `restart nash_phone`.
-4. With `Config.Debug = true` in [config/main.lua](config-main.md), run `/phonelogtest`: every
-   active event sends one sample log. `/phonelogtest birdby_post` sends only that one.
+4. Do the action for real in game: for example, publish a BirdBy post to test `birdby_post`, or
+   take a photo with the Camera to test `camera_photo`. The log arrives in the channel a few
+   seconds later. If Discord refuses it, the server console says why (see
+   [Troubleshooting](#troubleshooting)).
 
 One public channel per app, with every action still logged for your staff:
 
@@ -180,7 +187,8 @@ table directly.
 1. In your Fivemanage dashboard, open **Logs** and note the dataset you want to write to.
 2. Create an API token with access to logs, and paste it into `admin.fivemanageKey`.
 3. Set `admin.service` to `'fivemanage'` or `'both'`, and `admin.dataset` to your dataset.
-4. `restart nash_phone`, then `/phonelogtest`.
+4. `restart nash_phone`, then do one of the logged actions in game and look for the entry in
+   your dataset.
 
 Logs are sent in batches, every three seconds. Each entry carries:
 
@@ -215,8 +223,8 @@ as well.
   webhook; past that, new logs for that webhook are dropped until the queue drains.
 - **Text length.** Texts are cut to Discord's limits (title 256 characters, text 4000, field 1000,
   plain message 2000).
-- **Test commands.** The fake content of `/phonefakepost`, `/phonefakestory` or `/phonefakemsg`
-  does not produce logs: only real player actions and `/phonelogtest` do.
+- **Real actions only.** A log is written when a player actually does the action in the phone.
+  There is no command that sends a sample log.
 
 ## Troubleshooting
 
@@ -230,11 +238,19 @@ every five minutes per webhook.
 
 The token is wrong or does not cover logs. Check `admin.fivemanageKey` and `admin.dataset`.
 
-**`/phonelogtest` answers that no log is active.** Every event has either no link to send to, or
-`admin` and `public` set to `false`. Fill in `admin.webhook`, `public.webhook` or a Fivemanage token.
+**The action was done in game, nothing arrived, and the console stays silent.** The phone found
+nowhere to send that log, and it says nothing in that case. Check, in this order:
+
+- `enabled` is not `false`.
+- The event has a line in `events`, with `admin` or `public` other than `false`.
+- `admin = true` or `public = true` needs `admin.webhook` or `public.webhook` to be filled in.
+- Every link is a Discord webhook address: any other address is ignored, as if the field were
+  empty.
+- With `admin.service = 'fivemanage'` or `'both'`, a token is set in `admin.fivemanageKey` or in
+  [config/upload.lua](config-upload.md).
+- The event can be public at all: see the table in [Events](#events).
 
 ## Related pages
 
 - [config/upload.lua](config-upload.md): the Fivemanage media key
-- [Commands](../developer-api/commands.md): `/phonelogtest`
 - [Server Events](../developer-api/server-events.md): the events to write your own logging

@@ -13,7 +13,8 @@ server prints a red banner at every start.
 ## Prerequisites
 
 - Filesystem access to the `nash_phone` resource folder
-- `screenshot-basic` started on the server: it is what captures the game view
+- `screenshot-basic` started on the server is recommended: the Camera falls back on it when it
+  cannot read the game view, and Snapz and ChatApp use it for the automatic profile picture
 - A free [fivemanage.com](https://fivemanage.com) account. No credit card
 
 ## Why an external host is needed
@@ -39,9 +40,9 @@ Config.Upload = {
 }
 ```
 
-{% hint style="warning" %}
-The file ships with an example key that is **not yours**. Left in place, that account hosts
-your server's pictures and receives the bandwidth bill. Replace it before going live.
+{% hint style="info" %}
+The file ships with an empty `apiKey`. As long as it stays empty, the camera refuses to shoot,
+whatever `provider` says.
 {% endhint %}
 
 ## 3. Leave the file where it is
@@ -86,20 +87,16 @@ restart nash_phone
 4. In Photos, open the **Albums** tab: the **+** button at the top is there. It only appears
    when the phone sees a host. Tap it and paste the link of any picture: the picture lands in
    the Library and in **Recently Saved**.
-5. With `Config.Debug = true` in `config/main.lua`:
-
-    ```
-    /phonedeps    -> tells you whether screenshot-basic is started
-    /phoneconfig  -> Hebergeur   fivemanage, cle renseignee
-    /phonecheck   -> reports "aucun hebergeur de medias" when the key is still missing
-    ```
 
 ### If pictures still do not save
 
-Two causes, and `/phonedeps` tells them apart:
+Two common causes:
 
-- the key in `config/upload.lua` was not replaced;
-- `screenshot-basic` is not started.
+- the key in `config/upload.lua` is missing or empty: the red banner above is still printed at
+  every start;
+- `screenshot-basic` is not started, which matters when the Camera falls back on it: that
+  capture then ends on a `Capture failed.` notification. Check that `screenshot-basic` is
+  started in your `server.cfg`.
 
 ## Why not a Discord webhook
 
@@ -147,7 +144,8 @@ were re-hosted on Fivemanage before being saved, so their address never points a
 ## Upload limits
 
 Uploads are rate-limited per player, and both halves of an upload share one counter:
-**12 uploads per minute per player**. The limit exists because removing the key from the
+**24 presigned addresses per minute per player**. A Camera photo or video takes two (the file
+and its thumbnail), so that is about **12 photos or videos per minute**. The limit exists because removing the key from the
 client prevents *reading* it, not *using* it: each upload request consumes your Fivemanage
 quota whether or not a file follows.
 

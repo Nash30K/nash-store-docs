@@ -12,28 +12,37 @@ Both keys are in `config/main.lua`.
 
 {% hint style="danger" %}
 With `Config.UseItem = true` (the default), there is **no way around the item**. The `/phone`
-command and the open key both go through the same server-side check
-(`nash_phone:requestOpen`), and nobody can carry an item that does not exist, not even an
-admin. Either declare the item, or set `Config.UseItem = false`.
+command and the open key go through a server-side check (`nash_phone:requestOpen`), and the
+client exports `ToggleOpen` and `OpenApp` ask the server the same question (the
+`nash_phone:canOpen` callback) before opening. Nobody can carry an item that does not exist,
+not even an admin. Either declare the item, or set `Config.UseItem = false`.
 {% endhint %}
 
 ## No `client.export` to add
 
 Unlike most phone scripts, you do not wire a usable-item export. `nash_phone` registers the
-handler itself at boot, through the framework bridge:
+handler itself at boot, once the framework is detected (it waits up to 60 seconds for it):
 
-| Framework | What the phone calls |
+| Setup | What the phone calls |
 |---|---|
-| ESX | `ESX.RegisterUsableItem` |
-| QBCore | `QBCore.Functions.CreateUseableItem` |
-| QBOX | `exports.ox_inventory:RegisterUsableItem` |
+| `qs-inventory` (any framework) | `exports['qs-inventory']:CreateUsableItem` |
+| Custom inventory whose `usableItem` returns `true` | Your `NashInvCustom.usableItem` |
+| Otherwise, on ESX | `ESX.RegisterUsableItem` |
+| Otherwise, on QBCore | `QBCore.Functions.CreateUseableItem` |
+| Otherwise, on QBOX | `exports.qbx_core:CreateUseableItem` |
+
+The inventory is asked first; the framework only when the inventory does not register the item
+itself, so the item is never registered twice. The earbuds item is registered the same way when
+`Config.Earbuds.enabled` is `true`. `ox_inventory` has no entry of its own: it uses the usable
+items of the framework underneath.
 
 You only have to declare the item. Using it opens the phone.
 
 {% hint style="warning" %}
-On **QBOX**, usable items belong to `ox_inventory`, not to the core. On a QBOX server without
-`ox_inventory`, using the item does nothing. The open key and `/phone` still work for anyone
-who owns the item, and the boot diagnostic reports it.
+On **QBOX**, the phone registers the item in `qbx_core`, and it is `ox_inventory` that calls it
+when a player uses the item. QBOX has no inventory of its own: on a QBOX server without
+`ox_inventory` (or `qs-inventory`), using the item does nothing. The open key and `/phone`
+still work for anyone who owns the item.
 {% endhint %}
 
 ## ox_inventory
@@ -58,9 +67,7 @@ Add the entries to `ox_inventory/data/items.lua`:
 },
 ```
 
-The same snippets are in the comments of `config/main.lua` (phone) and
-`sql/item_earbuds.sql` (earbuds), with French labels. The `label` is what players read in
-their inventory, so translate it to your server's language.
+The `label` is what players read in their inventory, so translate it to your server's language.
 
 Then:
 
@@ -73,12 +80,13 @@ restart ox_inventory
 The classic ESX inventory reads its items from the `items` table in the database. Two ready
 files ship with the resource:
 
-| File | Item |
-|---|---|
-| `sql/item_phone.sql` | `phone` |
-| `sql/item_earbuds.sql` | `phone_earbuds` |
+| File | Item | Label it inserts |
+|---|---|---|
+| `sql/item_phone.sql` | `phone` | `Téléphone` |
+| `sql/item_earbuds.sql` | `phone_earbuds` | `Écouteurs sans fil` |
 
-Or run the inserts directly:
+Both files ship with French labels: on a server in another language, change the label before
+importing them. Or run the inserts directly, with English labels:
 
 ```sql
 INSERT INTO `items` (`name`, `label`, `weight`) VALUES ('phone', 'Phone', 1)
@@ -134,7 +142,7 @@ phone registers both items as usable through `exports['qs-inventory']:CreateUsab
 ## qb-inventory and derivatives
 
 Declare the items in `qb-core/shared/items.lua`, following the shape of the entries already
-in that file. The item **names** must match `Config.ItemName` and `Config.Earbuds.itemName`;
+in that file. The `sql/` files are for the ESX `items` table and do not apply here. The item **names** must match `Config.ItemName` and `Config.Earbuds.itemName`;
 the rest (label, weight, image) is yours. `ps-inventory` and `lj-inventory` are detected the
 same way.
 
@@ -145,12 +153,16 @@ no longer has these functions on the player.
 ## Custom inventory
 
 Set `Config.Inventory = 'custom'` in `config/bridge.lua` and fill `NashInvCustom` in
-`server/bridge/custom.lua`. The phone asks an inventory only two things:
+`server/bridge/custom.lua`. Two functions are required:
 
 | Function | Returns | Used for |
 |---|---|---|
-| `hasItem(src, item)` | `boolean` | Can this player open the phone / use the earbuds |
+| `hasItem(src, item)` | `boolean` | Can this player open the phone, and keep music in the earbuds |
 | `itemExists(name)` | `true`, `false`, or `nil` | The boot check below |
+
+Three more are optional: `serial` and `porteSerial` (recognising a new handset) and
+`usableItem` (when your inventory registers usable items itself). See
+[Custom Inventory](../compatibility/custom-inventory.md).
 
 `itemExists` returns three values on purpose. `nil` means "cannot conclude" (inventory not
 loaded yet, export missing) and the phone stays quiet: a false alarm would send an admin
@@ -167,9 +179,9 @@ inventory's own admin command.
 
 ## The boot check
 
-Fifteen seconds after start (enough for the inventory to finish loading its item list), the
-server verifies that `Config.ItemName` actually exists. If it does not, it prints this block
-in red:
+With `Config.UseItem = true`, fifteen seconds after the framework is detected (enough for the
+inventory to finish loading its item list), the server verifies that `Config.ItemName` actually
+exists. If it does not, it prints this block in red:
 
 ```
 ========================================================================
@@ -177,15 +189,15 @@ in red:
 [nash_phone] in your inventory -> NOBODY can open the phone.
 [nash_phone] The /phone command and the F1 key both check this item on the
 [nash_phone] server, so there is no way around it. Pick ONE fix:
-[nash_phone]   1. create the item in your inventory. See the "ITEM PHONE"
-[nash_phone]      section of config/main.lua (ox_inventory / qb-core examples)
+[nash_phone]   1. create the item in your inventory (documentation: Installation > Inventory Items)
 [nash_phone]      or import sql/item_phone.sql if your framework keeps items in the database.
 [nash_phone]   2. or set Config.UseItem = false in config/main.lua to open
 [nash_phone]      the phone without any item.
 ========================================================================
 ```
 
-`/phonecheck` reports the same condition as a blocking issue.
+When the item exists, nothing is printed. The earbuds item gets the same check, with a yellow
+warning instead: without it nobody can pair earbuds, and nothing else changes.
 
 ## Opening without an item
 
@@ -202,8 +214,8 @@ for a server that hands phones to every citizen by design.
 | Key | Default | Meaning |
 |---|---|---|
 | `Config.Earbuds.enabled` | `true` | `false` removes the feature entirely and hides the setting |
-| `Config.Earbuds.itemName` | `'phone_earbuds'` | Item name, to create in your inventory |
-| `Config.Earbuds.requireItem` | `true` | Must the player still carry the item for the earbuds to work |
+| `Config.Earbuds.itemName` | `'phone_earbuds'` | Item name, to create in your inventory. Using it is the only way to pair the earbuds, whatever `requireItem` says |
+| `Config.Earbuds.requireItem` | `true` | Must the player still carry the item for the earbuds to work after pairing |
 
 Music from the Music app plays out of the speaker by default: everyone nearby hears it. With
 earbuds connected, that player alone hears it.

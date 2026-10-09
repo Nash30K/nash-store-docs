@@ -68,13 +68,14 @@ Config.Apps = {
     snapz    = { enabled = true, store = true },
     chatapp  = { enabled = true, store = true },
     birdby   = { enabled = true, store = true },
+    cindr    = { enabled = true, store = true },   -- dating app, settings in Config.Social.Dating
 }
 ```
 
 {% hint style="info" %}
 `safari` is a **decorative** browser. It renders a start page with the favourites from
-`Config.Brand.site` and goes nowhere: the embedded browser the phone runs in has no network
-access at all. Keep it or disable it, but do not expect it to load a real website.
+`Config.Brand.site` and goes nowhere: it is not a web browser. Keep it or disable it, but do
+not expect it to load a real website.
 {% endhint %}
 
 ## 1. Preinstall an App Store app
@@ -109,6 +110,10 @@ snapz    = { enabled = true, store = true, name = 'SnapCity' },
 
 The name replaces the translated one, so it is identical in every language.
 
+The publisher shown on the App Store sheet of every app is `Config.Brand.studio` in
+`config/main.lua` (`'Nash Store'` by default). It is one value for all apps: change it there to
+show your own studio name.
+
 ## 4. Remove an app entirely
 
 ```lua
@@ -116,7 +121,7 @@ stocks = { enabled = false },
 snake  = { enabled = false },
 ```
 
-The app vanishes from the home screen, the App Store, the library, the search and Settings -
+The app vanishes from the home screen, the App Store, the library, the search and Settings,
 including for players who already had it.
 
 {% hint style="danger" %}
@@ -138,7 +143,7 @@ The warning looks like this:
 ```
 ========================================================================
 [nash_phone] config/apps.lua : attention aux consequences ci-dessous.
-[nash_phone]    appstore desactive -> 11 app(s) marquee(s) 'store' sont inaccessibles.
+[nash_phone]    appstore desactive -> 12 app(s) marquee(s) 'store' sont inaccessibles.
 [nash_phone]    settings desactive -> plus de fond d ecran, de sonnerie ni de langue.
 ========================================================================
 ```
@@ -154,19 +159,5 @@ see [Add a third-party application](add-custom-app.md).
 2. A disabled app must be gone from **four** places, not one: home screen, App Store, app
    library (swipe left past the last page) and the Settings app list.
 3. A renamed app shows its new name under the icon and in the search results.
-4. With `Config.Debug = true` in `config/main.lua`, run `/phoneconfig`. It prints one summary
-   line built from the configuration the server **actually read**, which immediately exposes a
-   malformed block that was silently ignored:
-
-    ```
-    Applications        32 reglees, 2 desactivees, 11 a telecharger
-      -> « stocks » desactivee.
-      -> « appstore » desactivee : plus aucune app a telecharger n est installable.
-    ```
-
-5. `/phonecheck` reports the same critical disables as a problem rather than as information.
-
-{% hint style="warning" %}
-Put `Config.Debug` back to `false` afterwards. The debug commands write to the database and
-push events on the player's behalf.
-{% endhint %}
+4. If you disabled `appstore`, `settings`, `phone` or `messages`, the yellow warning block shown
+   above appears in the server console at startup.

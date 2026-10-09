@@ -36,12 +36,13 @@ and `components`.
 ## The three traps that cost the most time
 
 {% hint style="danger" %}
-**The `ui` path starts with the name of YOUR resource.** Writing `ui/index.html` would point
-the iframe at the phone itself: blank page, no error. The phone actually refuses a path with
-no resource name and tells you in the console:
+**The `ui` path starts with the name of YOUR resource.** The phone loads it as
+`nui://<ui>`, so the first folder of the path is read as a resource name. Writing
+`ui/index.html` points the iframe at a resource called `ui`: blank page, no error. Only a path
+with no folder at all is refused, with a line in the F8 console:
 
 ```
-[nash_phone] app personnalisée refusée (my_resource) : ui = 'ui/index.html' n'a pas de nom de ressource ; attendu 'my_resource/ui/index.html'
+[nash_phone] app personnalisée refusée (my_resource) : ui = 'index.html' n'a pas de nom de ressource ; attendu 'my_resource/index.html'
 ```
 
 **Declare your files in the `files{}` block of your `fxmanifest.lua`.** A file that is not
@@ -150,21 +151,15 @@ works without an explicit `identifier`.
 
 | Field | Type | Description |
 | ----- | ---- | ----------- |
-| `identifier` | `string` | **Required.** Unique id, never shown to the player. Two apps cannot share one |
+| `identifier` | `string` | **Required.** Unique id, never shown to the player. Declaring a second app with the same identifier replaces the first |
 | `name` | `string` | Name under the icon. Falls back to `identifier` |
-| `description` | `string` | Description, visible in the App Store |
-| `developer` | `string` | Author name, visible in the App Store |
-| `icon` | `string` | Icon URL. For an image in your resource: `'https://cfx-nui-' .. GetCurrentResourceName() .. '/ui/icon.png'` |
-| `ui` | `string` | Path to your interface's HTML, **prefixed with your resource name**: `'my-resource/ui/index.html'`. Without it the app only calls `onUse` when tapped, and opens nothing |
-| `defaultApp` | `boolean` | `true` = placed on the home screen at first boot. `false` = downloaded from the App Store. Default `true` |
-| `game` | `boolean` | `true` = filed under the App Store's Games category |
-| `size` | `number` | Size advertised in the App Store, in KB. Purely cosmetic |
-| `images` | `string[]` | Screenshot URLs shown on the App Store sheet |
-| `price` | `number` | In-game price to download it. `0` = free |
+| `icon` | `string` | Icon URL. For an image in your resource: `'https://cfx-nui-' .. GetCurrentResourceName() .. '/ui/icon.png'`. Without it, the icon is a coloured tile with the first letter of the name |
+| `ui` | `string` | Path to your interface's HTML, **prefixed with your resource name**: `'my-resource/ui/index.html'`. Without it, tapping the icon calls `onUse` and shows a short screen saying the app has no interface |
+| `defaultApp` | `boolean` | Default `true`: the icon is placed on the last page of the home screen. `false`: the app is not placed on the home screen, and it is removed from home screens where it already was (unless the player installed it). Custom apps are **not** listed in the App Store, so with `false` players have no way to reach the app |
 | `landscape` | `boolean` | `true` = the app displays in landscape |
-| `keepOpen` | `boolean` | `true` = the phone does **not** close when the player opens the app. Reserve this for apps that take over the screen, such as a camera |
 | `onUse` | `function` | Called **client side** when the app is opened |
-| `onServerUse` | `function` | Called **server side** when the app is opened. Receives the player's `source` |
+| `onServerUse` | `function` | Called **server side** when the app is opened. Receives the player's `source`. Only works from `Config.CustomApps` (see below) |
+| `description`, `developer`, `game`, `size`, `images`, `price`, `keepOpen` | | Accepted, so that a table written for LB Phone declares without errors, but **not used** by NASH Phone in the current release: custom apps have no App Store page to show them on, and `keepOpen` changes nothing |
 
 {% hint style="warning" %}
 **`onServerUse` only works for apps declared in `Config.CustomApps`.** A Lua function does not
@@ -172,13 +167,16 @@ cross the network: an app declared at runtime by `AddCustomApp` from a *client* 
 deliver its `onServerUse` to the server, because the function only exists in the client
 context.
 
-For those apps, listen to the public event from your own server script instead:
+The phone also fires the server event `nash_phone:customAppUsed` (`src`, `identifier`), but only
+for an app that declares an `onServerUse`: in practice, an app of `Config.CustomApps`. For an
+app added with `AddCustomApp`, trigger your own server event from your own client code, for
+example from the NUI callback your interface calls when it opens:
 
 ```lua
--- server.lua of YOUR resource
-AddEventHandler('nash_phone:customAppUsed', function(src, identifier)
-    if identifier ~= 'nash_example' then return end
-    print(('[example] player %s opened the app'):format(src))
+-- client.lua of YOUR resource
+RegisterNUICallback('opened', function(_, cb)
+    TriggerServerEvent('my_resource:opened')
+    cb({ ok = true })
 end)
 ```
 {% endhint %}
@@ -337,16 +335,16 @@ The only obstacle is the resource name it calls in its own Lua.
 - **If it is escrow-protected**: use the `nash_lbcompat` resource, shipped separately, which
   answers to the expected name and forwards the calls. Read its `README.md` first: it has to be
   **renamed** to the name the app calls (FiveM resolves `exports['a-name']` by folder name), it
-  must start **after** `nash_phone`, and it must never run alongside the original resource -
-  two resources cannot share a name, and the server would start one of them at random.
+  must start **after** `nash_phone`, and it must never run alongside the original resource
+  (two resources cannot share a name, and the server would start one of them at random).
 
 An app is only as portable as the functions it uses. The table above, plus the
 [Developer API](../developer-api/README.md) for the Lua side, say exactly what you can rely on.
 
 ## How to know it works
 
-1. Start your resource after `nash_phone`. The icon appears on the home screen (with
-   `defaultApp = true`) or in the App Store.
+1. Start your resource after `nash_phone`. The icon appears on the last page of the home
+   screen (with `defaultApp = true`, the default).
 2. Open the app. Your HTML renders inside the phone frame, with the status bar over it.
 3. If the page is blank, in this order: check that `ui` starts with your resource name, that
    `files{}` declares your HTML, and that the file path is right. None of those three produces

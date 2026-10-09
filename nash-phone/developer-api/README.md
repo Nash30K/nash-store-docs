@@ -8,10 +8,12 @@ call, what each call actually does, and what it returns.
 
 | Page | Contents |
 | ---- | -------- |
-| [Server Exports](server-exports.md) | 54 exports declared on the server: numbers, notifications, contacts, SMS, wallet history, calls, mail |
-| [Client Exports](client-exports.md) | 67 exports declared on the client: opening the phone, applications, flashlight, battery, orientation, shell colour |
-
-Events, callbacks and commands are covered by the remaining pages of this section.
+| [Server Exports](server-exports.md) | 60 exports declared on the server: numbers, notifications, contacts, SMS, wallet history, calls, mail, Services duty, first-run setup |
+| [Client Exports](client-exports.md) | 73 exports declared on the client: opening the phone, applications, notifications, flashlight, battery, orientation, shell colour |
+| [Client Events](client-events.md) | Events fired on the player's client, net events, state bags |
+| [Server Events](server-events.md) | Hooks fired on the server when something happens inside the phone |
+| [Commands](commands.md) | Player commands, key bindings, the server console command |
+| [Custom Applications](custom-apps.md) | Adding your own app: `AddCustomApp`, the iframe bridge, components |
 
 ## Calling convention
 
@@ -27,8 +29,8 @@ exports.nash_phone:OpenApp('messages')
 ```
 
 A few names exist on both sides with different signatures (`GetEquippedPhoneNumber`,
-`HasPhoneItem`, `GetConfig`, `GetSettings`, `SendNotification`, `AddContact`, `IsInCall`,
-`IsPhoneDead`). Read the page for the side you are calling from before assuming the
+`GetPhoneNumber`, `HasPhoneItem`, `GetConfig`, `GetSettings`, `SendNotification`, `AddContact`,
+`SendCustomAppMessage`, `IsInCall`, `IsPhoneDead`). Read the page for the side you are calling from before assuming the
 behaviour, because two of those pairs disagree on purpose:
 
 | Export | Server | Client |
@@ -41,13 +43,15 @@ behaviour, because two of those pairs disagree on purpose:
 Numbers are strings built from `Config.Phone` in `config/main.lua`: the prefix (`'555'` by
 default), a hyphen, then `digits` digits (`7` by default), which gives `555-0123456`.
 
-One number is assigned per framework identifier and is never reassigned. The only write to
-the `nash_phone_phones` table anywhere in the resource is the insert that creates it, so a
-number you cache in your own script stays valid for the life of the character.
+One number is assigned per framework identifier and is never reassigned. The resource never
+changes or deletes a number once its row exists in `nash_phone_phones` (the only later write
+to that table is an internal bookkeeping flag), so a number you cache in your own script stays
+valid for the life of the character.
 
 The hyphen is load-bearing: several server exports accept either a server id or a phone
-number in the same parameter, and they tell them apart by looking for that hyphen. A number
-generated with `prefix = ''` and no hyphen would be read as a server id.
+number in the same parameter, and they tell them apart by looking for that hyphen. The
+generator always inserts it, even with `prefix = ''` (which gives `-0123456`), so never strip
+it from a number before passing it back to the phone.
 
 ## State bags
 
@@ -65,6 +69,11 @@ call, especially in a loop.
 `phoneNumber` and `phoneName` are set when the framework reports the player as loaded, not
 when the phone is first opened, so they are already filled for a player who has never taken
 their phone out.
+
+{% hint style="info" %}
+Only the server writes `phoneNumber` and `phoneName`: if a client changes one of them on its own
+state bag, the server puts the real value back right away.
+{% endhint %}
 
 ## Compatibility exports
 
@@ -98,10 +107,10 @@ Feature by feature, here is what is actually behind the compatibility names:
 | Phone shell, torch, battery, orientation | Not exposed | Implemented |
 | Social networks, dark chat, crypto, cell towers, security PIN | Stubs | Stubs |
 
-The social applications, the crypto market and the security code are not missing from the
-phone. They exist with their own backend and their own database tables; they simply have no
-public export in this API, and the compatibility names that would reach them on another
-phone are inert here.
+The social applications and the lock code are not missing from the phone. They exist with
+their own backend and their own database tables; they simply have no public export in this
+API, and the compatibility names that would reach them on another phone are inert here.
+There is no crypto wallet in NASH Phone at all: every crypto name is a stub on both sides.
 
 ## Reading the API pages
 

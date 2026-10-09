@@ -78,37 +78,53 @@ Automatic detection tries **ox, then qs, then qb, then framework**. `ox_inventor
 because when it is running it is the resource that actually holds the items, whatever framework
 sits underneath. `qs-inventory` comes before `qb` because on QBCore it replaces `qb-inventory`.
 
-The phone asks an inventory only two questions: does this player own the phone item, and is
-that item declared on the server. Nothing else. Both are used by `Config.UseItem` /
-`Config.ItemName` in [config/main.lua](config-main.md).
+The phone asks an inventory three things: does this player own an item (the phone, and the
+earbuds of `Config.Earbuds`), is that item declared on the server, and which serial the phone
+item carries, so that a different handset replays the first-run setup (see
+[A new phone asks again](config-setup.md#a-new-phone-asks-again)). The item settings are
+`Config.UseItem` / `Config.ItemName` in [config/main.lua](config-main.md). qs-inventory also
+registers the usable item itself.
+
+An unknown value prints `Config.Inventory = "..." : inconnu. Attendu : auto, ox, qs, qb,
+framework, custom.` in the server console, and the phone then sees no inventory at all.
 
 ## Custom bridge
 
 Set `Config.Framework = 'custom'` and/or `Config.Inventory = 'custom'`, then fill
-`server/bridge/custom.lua` and restart the resource. That file is the only one in the phone
-meant to be edited: everything else can be updated without touching it.
+`server/bridge/custom.lua` and restart the resource. Apart from the files of `config/`, it is the
+only Lua file of the phone you can read and edit: every other Lua file is protected by FiveM
+Asset Escrow.
 
 `server/bridge/custom.lua` never self-detects. It is used only when you name it here.
 
 ### Framework functions (`NashFw.custom`)
 
-Only `identifier` is mandatory. Any function you leave empty returns a neutral value and
-writes one console warning, so the phone still boots and you can wire things up in stages.
+Only `identifier` is mandatory. The template's functions already return neutral values
+(`nil`, `0`, `false`), so the phone boots before you have filled anything. A function you delete
+from the table is replaced by a neutral value and writes one console warning, so you can wire
+things up in stages.
 
 | Function | Required | What you lose if left empty |
 | -------- | -------- | --------------------------- |
-| `identifier(src)` | **Yes** | Nothing works. This is the key of every phone table |
+| `identifier(src)` | **Yes** | Nothing works. This is the key of every phone table: a string of 64 characters at most |
 | `fullName(src)` | No | The RP name shows as "Unknown" (translated) everywhere |
 | `getPlayer(src)` | No | Only passed back to other functions of the same bridge |
-| `group(src)` | No | No admin command is ever granted |
+| `group(src)` | No | Nothing: the phone does not read it at the moment |
 | `job(src)` | No | The Services app recognises no employee |
 | `getBank(src)` / `getCash(src)` | No | The Wallet app shows 0 |
 | `addBank(src, amount)` / `removeBank(src, amount)` | No | Transfers fail |
 | `players()` | No | Returns an empty list |
 | `usableItem(name, cb)` | No | The phone no longer opens from the item, only from the key |
 | `setPhoneNumber(src, number)` | No | `Config.Phone.syncFramework` copies nothing into the character data |
-| `invHasItem(src, item)` | No | Only used when `Config.Inventory = 'framework'` |
-| `invItems()` | No | The item-declaration check cannot run |
+| `invHasItem(src, item)` | No | Only used when `Config.Inventory = 'framework'`: nobody holds the item |
+| `invItems()` | No | Only used with `'framework'` (and `'qb'`): the item-declaration check cannot run |
+| `invSerial(src, item)` | No | Only used with `'framework'`: a new handset is not recognised, the setup never replays |
+| `invPorteSerial(src, item, serial)` | No | Only used with `'framework'`: same as above |
+
+`invSerial` returns the serial stored **in** the phone item (write one on first read, 64
+characters at most), and `invPorteSerial` answers whether the player still carries the item with
+that serial: `true`, `false`, or `nil` when you cannot tell. See
+[Custom Inventory](../compatibility/custom-inventory.md).
 
 `job(src)` must return exactly this shape, or `nil`:
 
@@ -116,8 +132,9 @@ writes one console warning, so the phone still boots and you can wire things up 
 { name = 'police', grade = 3, gradeName = 'sergeant', label = 'Police', onDuty = true }
 ```
 
-`onDuty` is optional. It is only read when you set `Config.Services.ownDuty = false` to drive
-duty from your own system (see [config/services.lua](config-services.md)).
+`name` must match the `job` of an entry of [config/services.lua](config-services.md) for the
+Services app to recognise the employee. `onDuty` is accepted but not read by the phone: with
+`Config.Services.ownDuty = false`, duty only comes from the `SetServiceDuty` export.
 
 `NashFw.custom.playerLoadedEvent` names the event your framework fires when a character is
 loaded. Leave it `nil` if you have none: the phone catches up on the first NUI start instead,
@@ -125,7 +142,8 @@ a little later.
 
 `NashFw.custom.playerUnloadedEvent` names the server event fired when a player goes back to
 character selection without disconnecting, with the server ID as first argument. The phone
-then ends the call in progress and closes the byCloud session, as on a disconnection. Leave it
+then cleans up as on a disconnection: it ends the call in progress, closes the byCloud session,
+stops the music, takes the player off duty in Services and ends their live stream. Leave it
 `nil` without multiple characters.
 
 {% hint style="warning" %}
@@ -148,20 +166,31 @@ Independent from the framework: you can keep ESX and replace only the inventory.
 | -------- | ------- |
 | `hasItem(src, item)` | Boolean: does this player own the item |
 | `itemExists(name)` | `true` it exists, `false` it does not (the phone warns the admin), `nil` you cannot tell (the phone stays silent) |
-| `usableItem(name, cb)` | Optional. `true` when your inventory registered the usable item itself, so the framework does not |
+| `serial(src, item)` | Optional. The serial stored **in** the phone item, written on first read (64 characters at most), or `nil` if your inventory keeps no data per item. Without it a new handset never replays the setup |
+| `porteSerial(src, item, serial)` | Optional. Does the player still carry the item with this serial: `true`, `false`, or `nil` when unknown |
+| `usableItem(name, cb)` | Optional, not in the template. Register the usable item yourself and return `true`, so the framework does not |
+
+Never derive the serial from the player (identifier, number): it must live in the item, or every
+phone of a player would look like the same handset. See
+[Custom Inventory](../compatibility/custom-inventory.md).
 
 The third answer of `itemExists` matters. Returning `nil` is not a failure: it stops the phone
 from sending an administrator after a problem that may not exist.
 
 ## Checking what was picked
 
-With `Config.Debug = true` in [config/main.lua](config-main.md):
+Read the server console at startup:
 
-| Command | What it shows |
-| ------- | ------------- |
-| `/phonedeps` | Dependency status and what stops working without each one |
-| `/phoneconfig` | Summary of the configuration the server actually read |
-| `/phonecheck` | Short verdict: what is preventing the phone from working |
+| Line | Meaning |
+| ---- | ------- |
+| `[nash_phone] framework détecté : <name>.` / `[nash_phone] inventaire détecté : <name>.` | Automatic detection found that bridge |
+| `[nash_phone] framework : <name> (imposé par la configuration).` / `[nash_phone] inventaire : <name> (imposé par la configuration).` | The bridge was forced in this file |
+| `[nash_phone] inventaire : pont personnalisé.` | `Config.Inventory = 'custom'` and `NashInvCustom` was found |
+| `[nash_phone] AUCUN framework détecté pour l'instant. Le téléphone ne pourra identifier personne.` | No framework found: start your core **before** `nash_phone`, or set `'custom'` |
+| `[nash_phone] Config.Inventory = "custom" mais server/bridge/custom.lua ne définit pas NashInvCustom.` | `'custom'` is set but the inventory table of `server/bridge/custom.lua` is missing |
 
-`/phoneconfig` also reports whether the phone item is declared in the detected inventory, which
-is the usual reason a phone cannot be opened at all.
+About fifteen seconds after startup, a red block starting with
+`[nash_phone] Config.UseItem = true but the item "phone" DOES NOT EXIST` (with your
+`Config.ItemName`) means the detected inventory does not know the phone item, which is the usual
+reason a phone cannot be opened at all. See [Phone item](config-main.md#phone-item). When the
+inventory cannot tell (an `itemExists` that returns `nil`), the block is not printed.

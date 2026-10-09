@@ -4,103 +4,21 @@ Fast fixes for the problems we see most. Each entry lists the symptom, the cause
 Where the phone prints a message, that exact message is the heading.
 
 {% hint style="info" %}
-Before reading further: set `Config.Debug = true` in `config/main.lua`, restart the resource
-and run **`/phonecheck`**. It prints only what stops the phone from working, and it catches
-most of what is on this page in one line. Put `Config.Debug` back to `false` afterwards.
+Before reading further: restart the resource and read the server console from the top. At
+startup the phone prints, mostly in French, the framework and inventory it found, the database
+check (`schéma DB prêt`), one line per language loaded, and a red line or block for what stops
+it from working: no framework, a typo in `config/bridge.lua`, no image host, a phone item that
+does not exist. Most entries below start from one of those lines.
 {% endhint %}
-
-## Silent failures: read these first
-
-Three things in NASH Phone fail **without any error message at all**. They account for most
-support tickets, and none of them is visible in a code editor, in a build, or in the browser
-preview.
-
-### An NUI action does nothing in game, but works in the browser preview
-
-**Symptom:** a screen is complete on the server side, the browser preview answers, the
-TypeScript compiles, and in game the screen stays empty. Nothing appears in F8, nothing
-appears in the server console.
-
-**Cause:** the action is missing from the `FORWARD` table in `client/bridge/nui.lua`. That
-table is the list of NUI actions the client relays to the server callback of the same name.
-An action absent from it **never leaves the client**. The browser preview still answers
-because its mock router does not go through this file at all, which is exactly what makes the
-trap invisible.
-
-**Fix:** add the `Protocol.*` entry to `FORWARD`:
-
-```lua
-local FORWARD = {
-    Protocol.bootstrap,
-    -- …
-    Protocol.myNewAction,
-}
-```
-
-Only **request/response** actions belong there. Server pushes (`messagesIncoming`,
-`socialIncoming`, `mailIncoming`, `bankIncoming`, `liveState`, `liveFeed`, `servicesUpdate`,
-`rtcIncoming`) must stay out: listing one would register a `RegisterNUICallback` that nothing
-ever calls. Client-only callbacks (Maps, Compass, the AirDrop peer list) are registered by
-their own client file and are not in `FORWARD` either.
-
-Two shipped features were already caught by this during development, the mail app and the
-Snapz map. It shows up nowhere except in game, which is why `client/bridge/nui.lua` carries a
-warning comment above the Snapz entries.
-
-### A new column is missing on a server that was already running
-
-**Symptom:** one app answers with an error on a live server, while a fresh install of the
-same version works. `/phoneschema` reports missing columns.
-
-**Cause:** `CREATE TABLE IF NOT EXISTS` does nothing to a table that already exists. A column
-added after first release therefore never reaches an install that is already running, and only
-those installs.
-
-**Fix:** the column must be listed in the `COLUMNS` table of `server/db/schema.lua`, which
-is replayed at every boot and adds only what `information_schema` says is missing:
-
-```lua
-local COLUMNS = {
-    { 'nash_phone_calls', 'app_id', "VARCHAR(32) NOT NULL DEFAULT 'phone'" },
-    -- …
-}
-```
-
-If you hit this after updating the resource, restarting is enough: the migration runs at boot
-and prints what it added. The same rule applies to the `INDEXES` table just below it.
-
-```
-[nash_phone] schéma DB prêt (27 tables, 3 colonne(s) ajoutée(s), 2 index ajouté(s)).
-```
-
-### A CSS rule works in the preview and is ignored in game
-
-**Symptom:** a layout, a colour or a gradient is right in the browser and wrong (or missing)
-in game. No error anywhere.
-
-**Cause:** the FiveM in-game browser is a **Chromium 103**. It does not know `:has()`
-(Chromium 105), `color-mix()` (111), `oklch()` (111), range media-query syntax, the `lh` unit,
-or `field-sizing` (123). A declaration it does not understand is **dropped in silence**, and
-so is the whole rule when the selector is unknown.
-
-**Fix:** write the resolved value by hand rather than letting the browser compute it: a
-hand-written tint instead of `color-mix()`, a class set from the TSX instead of `:has()`, a
-pixel `min-height` instead of `2lh`. Test in game, not only in the preview.
-
-Two related rendering rules from the same engine:
-
-- A **composited** layer only receives a **rectangular** clip from its parent. A rounded
-  parent containing a `backdrop-filter` or a `transform` layer paints black corners unless the
-  child carries its own `clip-path`.
-- `transition` is a shorthand: writing it after other transition properties silently cancels
-  them.
 
 ## Startup
 
-### `[nash_phone] AUCUN framework détecté. Le téléphone ne pourra identifier personne.`
+### `[nash_phone] AUCUN framework détecté pour l'instant. Le téléphone ne pourra identifier personne.`
 
 **Cause:** `Config.Framework = 'auto'` and none of `qbx_core`, `qb-core`, `es_extended` was
-`started` when `nash_phone` booted.
+`started` when `nash_phone` booted. The phone keeps trying, so a framework that starts a little
+later is still picked up (the console then prints `framework détecté : …`). The line only
+matters if no `framework détecté` follows it.
 
 **Fix**
 
@@ -135,12 +53,12 @@ console:
 [nash_phone] framework détecté : qbox.
 ```
 
-### `[nash_phone] Config.Inventory = "…" : inconnu. Attendu : auto, ox, qb, framework, custom.`
+### `[nash_phone] Config.Inventory = "…" : inconnu. Attendu : auto, ox, qs, qb, framework, custom.`
 
 **Cause:** same typo, on the inventory side. `ox_inventory` is not a valid value; the value
-is `ox`.
+is `ox` (and `qs` for qs-inventory, `qb` for qb-inventory, ps-inventory and lj-inventory).
 
-**Fix:** use one of `auto`, `ox`, `qb`, `framework`, `custom` in `config/bridge.lua`.
+**Fix:** use one of `auto`, `ox`, `qs`, `qb`, `framework`, `custom` in `config/bridge.lua`.
 
 ### `[nash_phone] Config.Inventory = "custom" mais server/bridge/custom.lua ne définit pas NashInvCustom.`
 
@@ -156,27 +74,25 @@ server. See [Custom Inventory](compatibility/custom-inventory.md).
 **Cause:** your custom bridge does not implement a function the phone calls. It is a warning,
 not a crash: the phone returns a neutral value and carries on.
 
-**Fix:** implement the named function. Each missing one costs a feature: without
-`Framework.group` the debug commands only answer the ACE, without `Framework.hasItem` the item
-check cannot pass, without money functions the Wallet transfers cannot settle.
+**Fix:** implement the named function. Each missing one costs a feature: without `job` the
+services cannot tell who works where, without the money functions (`getBank`, `addBank`,
+`removeBank`) the Wallet transfers cannot settle.
 
-### `SCRIPT ERROR: server/main.lua:71: attempt to index a nil value (global 'Framework')`
+### `SCRIPT ERROR: server/main.lua:…: attempt to index a nil value (global 'Framework')`
 
-**Cause:** a stale `fxmanifest.lua` left on the server, or a glob that no longer returns what
-it used to, so `server/bridge/**.lua` did not load before `server/main.lua`. The tell-tale
-sign is the same console printing `framework détecté : esx` a second later: the table existed,
-it simply arrived too late for that line.
+**Cause:** a stale or edited `fxmanifest.lua` left on the server, so `server/bridge/**.lua` did
+not load before `server/main.lua`. The tell-tale sign is the same console printing
+`framework détecté : esx` a second later: the bridge existed, it simply arrived too late.
 
-**Fix:** replace `fxmanifest.lua` with the shipped one and restart. The current file loads
-`server/bridge/**.lua` first and defers the subscription into a `CreateThread`, so the
-dependency no longer exists; an old manifest reintroduces it.
+**Fix:** replace `fxmanifest.lua` with the shipped one and restart. The shipped manifest loads
+`server/bridge/**.lua` before `server/main.lua`; keep that order if you ever edit it.
 
 ## Opening the phone
 
 ### `[nash_phone] Config.UseItem = true but the item "phone" DOES NOT EXIST`
 
-The full block is red and six lines long. It appears 15 seconds after boot, once the inventory
-has finished loading its item list.
+The full block is red, framed by two lines of `=`. It appears 15 seconds after the framework
+is found, once the inventory has finished loading its item list.
 
 **Cause:** `Config.UseItem = true` but `Config.ItemName` matches nothing in your inventory.
 The resource creates no item.
@@ -206,46 +122,74 @@ The resource creates no item.
     ```
 
 {% hint style="danger" %}
-There is no way around this check. `/phone` and the key both go through the same server-side
-verification (`nash_phone:requestOpen`), and nobody can hold an item that does not exist: not
-even an admin.
+There is no way around this check. `/phone`, the key and the `ToggleOpen` / `OpenApp` client
+exports all go through the same server-side verification, and nobody can hold an item that
+does not exist: not even an admin.
 {% endhint %}
 
 ### Pressing the key does nothing, or the player is told "You don't have a phone."
 
-**Cause:** three possibilities, in order of frequency:
+**Cause:** four possibilities, in order of frequency:
 
 1. The player does not hold `Config.ItemName`. Give it: `/giveitem <id> phone 1`.
 2. The item does not exist at all: see the entry above.
 3. The phone was confiscated by another resource through
    `exports['nash_phone']:ToggleDisabled(true)` (jail, cuffs, no-signal zone). The player then
    gets "Your phone is out of order." instead of silence.
+4. The player is dead (or in last stand on QBCore and QBOX), or cuffed: the phone does not
+   open, on purpose.
 
-**Fix:** `/phonediag <server id>` reports whether that player has a number and what the
-server sees. `exports['nash_phone']:IsDisabled()` reads the confiscation flag client-side.
+**Fix:** what the player sees tells the cases apart. "You don't have a phone." comes from the
+server's item check (causes 1 and 2), "Your phone is out of order." from a confiscation
+(cause 3), and silence from cause 4. `exports['nash_phone']:IsDisabled()` reads the
+confiscation flag client-side.
 
-The key also does nothing on purpose while a call is on screen (the on-screen buttons take
-over), and the phone closes itself when the player dies.
+The key also does not put the phone away on purpose while a call or a live stream is in
+progress (the on-screen buttons take over), and the phone closes itself when the player dies.
 
-### Typing in the phone moves the character
+### Typing in the phone moves the character, or the player cannot walk with the phone open
 
-**Cause:** the `phone:inputFocus` callback did not fire, or another resource re-asserted
-`SetNuiFocus` without `SetNuiFocusKeepInput`.
+**Cause:** another resource changed the NUI focus while the phone was open. The phone opens
+with `SetNuiFocus(true, true)` **and** `SetNuiFocusKeepInput(true)` so the player can walk, and
+drops `KeepInput` only while a text field holds focus. A resource that calls `SetNuiFocus` on
+its own (a menu, a HUD, a radio) overrides that state.
 
-**Fix:** the phone opens with `SetNuiFocus(true, true)` **and**
-`SetNuiFocusKeepInput(true)` so the player can walk, and drops `KeepInput` only while a text
-field holds focus. Every path that restores focus must re-assert `KeepInput(true)`; if you
-patched `client/core/open_close.lua` or a screenshot / camera path, that is the line to check.
+**Fix:** find the resource that takes the focus while the phone is open (stop resources one by
+one to find it), and make it give the focus back when it closes. Closing and reopening the
+phone restores the phone's own focus.
 
 ## Database
+
+### A new column is missing on a server that was already running
+
+**Symptom:** one app answers with an error on a live server, while a fresh install of the
+same version works. `SHOW COLUMNS FROM <table>;` lists fewer columns than the same table in
+`sql/nash_phone.sql`.
+
+**Cause:** creating a table does nothing to a table that already exists, so a column added by
+an update has to be added to existing installs separately. The phone does it itself at every
+boot: it compares its tables with what the database reports and adds only what is missing.
+If the resource has not been restarted since the update, or the database user is not allowed
+to alter tables, the column is not there yet.
+
+**Fix:** restart the resource. The migration runs at boot and prints what it added, columns
+and indexes alike:
+
+```
+[nash_phone] schéma DB prêt (31 tables, 3 colonne(s) ajoutée(s), 2 index ajouté(s)).
+```
+
+If the column is still missing, check that the database user in `mysql_connection_string` has
+the `ALTER` privilege, restart the resource, then run `SHOW COLUMNS FROM <table>;` again.
 
 ### `[nash_phone] index ... sur ... non créé :`
 
 **Cause:** an `ALTER TABLE … ADD INDEX` failed. Usually a permissions issue, or a table too
 large for the operation to complete in the boot window.
 
-**Fix:** nothing breaks: a missing index makes lists slower, it does not make them wrong. Run
-`/phoneschema` to see which one is missing and add it by hand, for example:
+**Fix:** nothing breaks: a missing index makes lists slower, it does not make them wrong. The
+line names the index and its table; its columns are on the matching `KEY` line of that table
+in `sql/nash_phone.sql`. Add it by hand, for example:
 
 ```sql
 ALTER TABLE nash_phone_messages ADD INDEX pair_at (`sender`,`receiver`,`created_at`);
@@ -283,10 +227,11 @@ the first edit made in the app writes the local copy straight back.
 local copy is wiped automatically on a **character change**, so it never leaks from one
 character to another; it is not wiped by a manual SQL delete.
 
-### An app that was open shows stale data after a test command
+### An app that was open shows stale data after an SQL edit
 
-**Cause:** most apps read their data once, when they mount. Notes, Calendar and Reminders
-only read the server once per phone load.
+**Cause:** a row changed straight in the database is not pushed to the phone. Most apps read
+their data once, when they mount. Notes, Calendar and Reminders only read the server once per
+phone load.
 
 **Fix:** close and reopen the app. For Notes, Calendar and Reminders, restart the resource if
 they were opened earlier in the same session.
@@ -317,12 +262,14 @@ only a boolean saying whether a host is configured.
 
 ### "Capture failed." on every photo
 
-**Cause:** `screenshot-basic` is not started. The camera hides the phone, asks
-`screenshot-basic` for the frame, and posts it from that resource's own page.
+**Cause:** the camera normally captures its own viewfinder, which shows the game image. When
+the viewfinder has no game image for that player, the camera falls back to a full-screen shot
+through `screenshot-basic`, and `screenshot-basic` is not started.
 
-**Fix:** `ensure screenshot-basic`. `/phonedeps` tells you in one line whether the problem is
-the screenshot resource or the upload host: the two failure modes look identical from in
-game.
+**Fix:** `ensure screenshot-basic`. A failing upload host can look the same from in game, so
+rule it out in the server console: the red `Config.Upload is NOT configured` block at startup,
+or a `presign fivemanage` line when the host refuses the token (next entry). `screenshot-basic`
+is also what takes the profile pictures from the character's head in Snapz and ChatApp.
 
 ### `[nash_phone] envoi fivemanage refusé (HTTP 401)` / `presign fivemanage: refus (…)`
 
@@ -359,14 +306,15 @@ dashboard. See [How long links last](installation/image-hosting.md#how-long-link
 
 ### A player says photos stop working after a burst
 
-**Cause:** the upload limiter: 12 uploads per minute per player, shared between the presigned
-and relay paths. It exists because removing the API key from the client stops it being read,
-not used: without a counter, a modified client could drain your quota without sending a
-single file. Photos added by link count too, up to two uploads each (the picture and its
-thumbnail).
+**Cause:** the upload limiter: 24 upload requests per minute per player. A photo, a snap or a
+video sends two files (the media and its thumbnail), so that is about 12 photos a minute. A
+second limit caps what a player saves to Photos at 20 photos, videos and imports per minute. It
+exists because removing the API key
+from the client stops it being read, not used: without a counter, a modified client could
+drain your quota without sending a single file. Photos added by link count too, up to two
+requests each (the picture and its thumbnail).
 
-**Fix:** expected behaviour; wait a minute. If you need to change it, the constants are
-`UPLOAD_MAX`, `UPLOAD_WINDOW` and the two `COST_*` values in `server/services/upload.lua`.
+**Fix:** expected behaviour; wait a minute. The limit is fixed and is not a config setting.
 
 ### The + button is missing in Photos
 
@@ -401,15 +349,16 @@ server, so most of these failures never reach the server at all.
 | This image is too big (max 8,192 pixels per side and 50 million pixels in total). | The width or height is above `Config.Gallery.Import.MaxSidePx` (the number follows your setting), or the picture has more than 50 million pixels in total, whatever that setting says | Use a smaller version. Raising the limit gains nothing visible: every picture is brought down to `Config.Camera.Photo.LongEdgePx` anyway |
 | Uploading to the host failed. Try again. | The upload to Fivemanage failed: a network hiccup, a refused or revoked token, an exhausted account | Try again. If it fails every time, check the token as for the Camera (see the `presign fivemanage` entry above) |
 | Too many photos at once. Try again in a minute. | The rate limit, shared with the Camera | Wait a minute |
-| Something went wrong. Try again. | Anything not covered above, including the server refusing to save the final address | Try again. If every import fails this way while the Camera works, see the next entry |
+| Something went wrong. Try again. | Anything not covered above, including the server refusing to save the final address | Try again. If every import fails this way, see the next entry |
 
-### Every import ends on "Something went wrong. Try again.", but the Camera works
+### Every import ends on "Something went wrong. Try again.", and Camera photos are not saved
 
 **Cause:** your Fivemanage account serves files from a **custom domain**, and that domain is
-not listed in `Config.Gallery.Import.AllowedHosts`. The picture is uploaded, then the server
-refuses to save an address on a host it does not know. The Camera does not go through that
-check, which is why it keeps working. An entry the server could not read has the same effect:
-it lists ignored entries in the console at startup
+not listed in `Config.Gallery.Import.AllowedHosts`. The file is uploaded, then the server
+refuses to save an address on a host it does not know. Camera photos and videos go through the
+same check, so they fail too, and the server console prints, once, that the address returned by
+the host is not covered by `Config.Gallery.Import.AllowedHosts`. An entry the server could not
+read has the same effect: it lists ignored entries in the console at startup
 (`Config.Gallery.Import.AllowedHosts : entree(s) ignoree(s) : …`).
 
 **Fix:** add the domain in `config/main.lua`, keep `fivemanage.com`, and restart:
@@ -433,6 +382,21 @@ from the dashboard if you care about the space. See
 copy really happened, so this bubble means there is nothing to paste.
 
 **Fix:** try again. Nothing is lost: the photo and its link stay in the camera roll.
+
+### A video call has sound but no picture
+
+The call screen may say "No picture: a direct connection could not be made. The call continues
+with audio.", and the player's F8 console shows
+`[nash_phone] video: no route to the other player (a TURN relay is needed, see config/turn.lua)`.
+
+**Cause:** the two players could not connect directly (4G box, CGNAT, strict NAT, VPN), and the
+server has no TURN relay to carry the picture. Voice goes through `pma-voice` and keeps working.
+
+**Fix:** fill in [`config/turn.lua`](config/config-turn.md) with a free Cloudflare TURN key and
+restart the resource. The server console must then print
+`[nash_phone] video: Cloudflare TURN relay ready.` For tests, keep both phones open on the call:
+closing the phone stops the picture until it is opened again. See
+[Video calls and live streams](guides/setup-video-calls.md).
 
 ## The 3D model
 
@@ -476,6 +440,18 @@ file is never served to the client.
 `body`.** It is the flat colour of the faces catching the daylight; if it drops below its
 `body`, the area meant to lighten darkens instead and the chassis reads inside-out. Nothing
 breaks and nothing warns: the prop just looks dull.
+
+### `[nash_phone] Config.Animations : dictionnaire « … » introuvable.`
+
+Printed in the player's F8 console, once per dictionary.
+
+**Cause:** a `dict` in `Config.Animations` (`config/main.lua`), or in a state written as a
+table, names an animation dictionary that does not exist in the game. Usually a typo. The
+animations from that dictionary are not played; the phone itself keeps working.
+
+**Fix:** correct the dictionary name, or set the state to `false` to play nothing. A state
+missing from `passenger` falls back to `driver`, then to `onFoot`, so you do not need to copy
+every line.
 
 ### The colour a player picks is not the colour other players see
 
@@ -544,33 +520,28 @@ at load time.
 (that is how gallery photos hosted on Fivemanage display), but do not build a page that needs
 a CDN to render.
 
-The same reasoning explains `service_icons/`: it lives **outside** `web/build/` so that you can
-drop a PNG in without touching the bundle, and because a rebuild empties `web/build/`.
+The same reasoning explains `service_icons/`: service icons are files you drop in that folder,
+next to `config/`, never inside `web/build/`, which every phone update replaces.
+
+### A custom app looks right in a desktop browser and wrong in game
+
+**Symptom:** a layout, a colour or a gradient is right when you open your page in a desktop
+browser, and wrong (or missing) inside the phone. No error anywhere.
+
+**Cause:** the FiveM in-game browser is a **Chromium 103**. It does not know `:has()`
+(Chromium 105), `color-mix()` (111), `oklch()` (111), range media-query syntax, the `lh` unit,
+or `field-sizing` (123). A declaration it does not understand is **dropped in silence**, and
+so is the whole rule when the selector is unknown.
+
+**Fix:** write the resolved value by hand rather than letting the browser compute it: a
+hand-written tint instead of `color-mix()`, a class set from your script instead of `:has()`, a
+pixel `min-height` instead of `2lh`. Test in game, not only in a desktop browser.
+
+A related rendering rule from the same engine: a **composited** layer only receives a
+**rectangular** clip from its parent. A rounded parent containing a `backdrop-filter` or a
+`transform` layer paints black corners unless the child carries its own `clip-path`.
 
 ## Configuration traps
-
-### Editing `Config.Music.distance` in `config/main.lua` changes nothing
-
-**Cause:** `config/music.lua` assigns `Config.Music` as a whole and is loaded **after**
-`config/main.lua`. The audio block written in `main.lua` (`distance`, `defaultVolume`,
-`maxVolume`, `stopOnDeath`) is therefore replaced and never read. The code falls back to its
-own built-in values, which happen to match the shipped ones: so nothing looks wrong.
-
-**Fix:** put the four audio keys in `config/music.lua`, alongside `tracks` and `playlists`:
-
-```lua
-Config.Music = {
-    distance = 12.0,
-    defaultVolume = 0.4,
-    maxVolume = 1.0,
-    stopOnDeath = true,
-    tracks = { … },
-    playlists = { … },
-}
-```
-
-`/phonecheck` reports this as `reglages audio de Config.Music perdus : config/music.lua ecrase
-config/main.lua.`
 
 ### Places in the Maps app land next to the right spot
 
@@ -581,8 +552,8 @@ player's own position.
 
 **Fix:** put back the shipped values: `minX = -4149.5`, `maxX = 4889.2`, `minY = -5140.5`,
 `maxY = 8417.6`. If a single place is off while the others are right, its `coords` are wrong:
-stand on the spot, run `/phonepos`, and paste the printed block into `config/maps.lua`.
-`/phonecheck` flags bounds that break the proportion of the tiles.
+stand on the spot, run `/phonepos`, and paste the block it prints in your F8 console into
+`config/maps.lua`.
 
 ### The map stays a plain colour
 
@@ -602,8 +573,7 @@ working in the meantime.
 `555-XXXXXXX`, 11 characters. Depending on your SQL mode, the insert either fails or the
 number is silently cut.
 
-**Fix:** keep `#prefix + 1 + digits` at 16 or below. `/phonecheck` computes it and refuses to
-call the install clean above that.
+**Fix:** keep `#prefix + 1 + digits` at 16 or below. Nothing checks it for you at startup.
 
 ### `[nash_phone] Config.Earbuds is on but the item "phone_earbuds" does not exist in your inventory`
 
@@ -626,7 +596,7 @@ tell it who is on duty.
 exports['nash_phone']:SetServiceDuty(source, true)
 ```
 
-Also check that `job` in `config/services.lua` matches your framework's job name **exactly** -
+Also check that `job` in `config/services.lua` matches your framework's job name **exactly**:
 it is the only thing the server looks at.
 
 ### A player is stuck on the byCloud screen during first-launch setup
@@ -742,9 +712,9 @@ window shut.
 **Cause:** the transfer went through, but the two `nash_phone_bank` rows failed to write. The
 money movement is authoritative; the history is only its trace.
 
-**Fix:** check the database is healthy (`/phonedeps` reports whether it actually answers: a
-started `oxmysql` on a wrong connection string still reports `started`). The players' balances
-are correct; only the Wallet history is missing those two lines.
+**Fix:** check the database is healthy (see
+[oxmysql is started but nothing is saved](#oxmysql-is-started-but-nothing-is-saved)). The
+players' balances are correct; only the Wallet history is missing those two lines.
 
 ## Miscellaneous
 
@@ -754,29 +724,19 @@ are correct; only the Wallet history is missing those two lines.
 install this cannot happen: it is a safety net against a modified client, and against future
 keys turning the row into a dumping ground.
 
-**Fix:** nothing on your side. Unknown keys are dropped anyway; only keys listed in `ALLOWED`
-(`server/apps/settings.lua`) are ever written, and stray keys from an older version disappear
-on the next write.
+**Fix:** nothing on your side. Unknown keys are dropped anyway: the server only writes the
+settings it knows, and stray keys from an older version disappear on the next write.
 
-### "Test commands disabled. Set Config.Debug = true in config/main.lua."
-
-**Cause:** a player ran `/phonehelp` or another `/phone*` command with `Config.Debug = false`.
-The commands are registered even in production, so anyone can type them; this refusal is the
-only line of `server/dev/` an ordinary player can see, and it is translated into their own
-language.
-
-**Fix:** expected behaviour. Enable `Config.Debug` only for testing, and put it back to
-`false` before opening the server: those commands write to the database and push events in the
-player's name.
-
-### `/phonecheck` reports nothing wrong but nothing is saved
+### oxmysql is started but nothing is saved
 
 **Cause:** `oxmysql` is `started` on a wrong connection string. The resource state proves
 nothing about the database.
 
-**Fix:** `/phonedeps` runs a real `SELECT 1` and reports
-`aucune reponse (verifie mysql_connection_string)` when it fails. Fix
-`set mysql_connection_string` in `server.cfg` and restart.
+**Fix:** open the database your connection string points at and look for the phone's tables:
+`SHOW TABLES LIKE 'nash_phone%';` should list 31 of them, and `nash_phone_phones` gets one row
+for each character who has loaded in. If the tables are missing or empty there, fix
+`set mysql_connection_string` in `server.cfg` and restart, then check that the startup console
+prints the `schéma DB prêt` line.
 
 ## Logs
 
@@ -786,8 +746,9 @@ nothing about the database.
 HTTP 401: the token part of the link is wrong. HTTP 400: Discord rejected the message itself.
 
 **Fix:** copy the webhook link again from the channel settings (**Integrations** → **Webhooks**)
-into `config/logs.lua`, restart the resource and run `/phonelogtest`. The line is printed at most
-once every five minutes per webhook. See [config/logs.lua](config/config-logs.md).
+into `config/logs.lua`, restart the resource and trigger in game one of the events that
+webhook receives (a post, a transfer). The line is printed at most once every five minutes per
+webhook, and a restart resets that delay. See [config/logs.lua](config/config-logs.md).
 
 ### `[nash_phone] Logs : Fivemanage a refusé un envoi (HTTP 401). Vérifiez fivemanageKey et dataset dans config/logs.lua.`
 
@@ -802,4 +763,4 @@ is empty, the media key of `config/upload.lua` is used, and a media-only token i
 - [FAQ](faq.md): the questions behind most of these fixes
 - [First Launch](installation/first-launch.md): the checks to run before opening
 - [Configuration Files](config/README.md): every key in `config/`
-- [Commands](developer-api/commands.md): the full list of diagnostic and test commands
+- [Commands](developer-api/commands.md): the commands the phone registers

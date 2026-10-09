@@ -1,9 +1,10 @@
 # Client Exports
 
-67 exports are declared on the client, in `client/modules/exports.lua`. They cover everything
-that happens on the player's own screen: opening the phone, taking it away, opening an
-application, the torch, the battery indicator, the orientation and the colour of the device
-held in hand.
+73 exports are declared on the client. They cover everything that happens on the player's own
+screen: opening the phone, taking it away, opening an application, local notifications, the
+torch, the battery indicator, the orientation and the colour of the device held in hand. Four
+of them (`AddCustomApp`, `RemoveCustomApp`, `SendCustomAppMessage`, `GetCustomApps`) belong to
+the custom application API and are documented in [Custom Applications](custom-apps.md).
 
 All of them live in the `nash_phone` namespace and are called from a client script:
 
@@ -49,7 +50,18 @@ local isOpen = exports.nash_phone:ToggleOpen(open)
 **Behavior**
 
 - Opening is refused, and `false` is returned, when the phone was taken away with
-  `ToggleDisabled`, or when the player is dead or cuffed.
+  `ToggleDisabled`, or when the player is dead or cuffed. Opening a phone that is already open
+  returns `true`.
+- **The inventory item is checked.** With `Config.UseItem = true`, the export asks the server
+  through the callback `nash_phone:canOpen` before opening: the same check as the `/phone`
+  command and the key. A player who does not carry `Config.ItemName` gets the "You don't have a
+  phone." error notification (shown whatever `Config.NotifyStyle` is), the phone stays closed
+  and the export returns `false`.
+- With `Config.UseItem = true` the export **waits for the server's answer** before it returns,
+  so call it where your script is allowed to wait: a thread, an event handler, a command. With
+  `Config.UseItem = false` there is no round trip and it answers at once.
+- The server's answer also carries the serial of the handset the player carries, so a phone
+  that changed hands relocks behind Face ID exactly as it does with `/phone`.
 - Closing always succeeds and returns `false`.
 - Opening gives the interface keyboard and mouse focus while keeping game input alive, so the
   player can still walk with the phone in hand.
@@ -139,8 +151,12 @@ A phone that has been taken away:
   `nash_phone:open` event, and the `ToggleOpen` / `OpenApp` exports all go through the same
   guard;
 - no longer rings on an incoming call, and displays nothing;
-- no longer shows notifications: the client `SendNotification` returns `false` immediately;
+- refuses the client `SendNotification` export, which returns `false` immediately;
 - no longer lights anything: the torch is switched off and cannot be switched back on.
+
+The flag does **not** filter notifications pushed by the server (a new SMS, a mail, the server
+`SendNotification` export), nor the client `PushNotification` and `Notify` exports: those are
+still relayed to the interface.
 
 If the phone is open when the call is made, it closes immediately.
 
@@ -189,7 +205,8 @@ Nothing.
 **Behavior**
 
 - The page re-runs its bootstrap request, which re-reads the number, the settings, the home
-  screen layout and the rest of the player's data from the server.
+  screen layout and the rest of the player's data from the server. Like every bootstrap, it
+  fires the server event `nash-phone:numberChanged` again.
 - The web page itself is **not** reloaded and the phone is not opened or closed. This is a
   data refresh, not a restart.
 - Useful after your resource has changed something in the database directly and wants the
@@ -220,8 +237,9 @@ local number = exports.nash_phone:GetPhoneNumber()
 
 **Behavior**
 
-The value is pushed by the server when the player loads, and mirrored into the state bag
-`LocalPlayer.state.phoneNumber`, which other clients can read as well.
+The value is pushed by the server when the player loads. The server also publishes it on the
+state bag `LocalPlayer.state.phoneNumber`, which other clients can read as well. Only the server
+writes that bag: a value set from the client is reverted.
 
 </details>
 
@@ -276,8 +294,9 @@ local config = exports.nash_phone:GetConfig()
 - This is the **live table**, not a copy. Unlike the server export, nothing is stripped and
   nothing is duplicated: writing into it changes the behaviour of the phone for that player
   until the resource restarts. Read it, do not modify it.
-- `Config.Upload` does not exist on the client. The upload credentials are loaded from a
-  server-only file and are never sent to a player.
+- `Config.Upload` and `Config.Logs` do not exist on the client. `config/upload.lua` and
+  `config/logs.lua` are loaded on the server only, so their keys and webhooks are never sent
+  to a player.
 
 </details>
 
@@ -319,13 +338,84 @@ exports.nash_phone:SendNotification({ app = ..., title = ..., content = ... })
   without showing it on screen.
 
 {% hint style="warning" %}
-With the default `Config.NotifyStyle = 'phone'`, this export raises **two** notifications for
-one call: the one you asked for, plus a second one filed under the `phone` application. That
-is a known duplication of this compatibility export. Two alternatives declared in
-`client/modules/notifications.lua` push exactly one: `PushNotification(appId, title, text,
-icon)` for an entry inside the phone, and `Notify(title, text, kind)` for a toast outside it.
-For anything that should survive a reconnection, use the server export instead.
+This export raises **two** notifications for one call: the one you asked for, plus the same
+title and text through `Notify` below, which with the default `Config.NotifyStyle = 'phone'`
+files a second entry under the `phone` application (with `'oxlib'` it shows an `ox_lib`
+toast instead, with `'both'` it does the two). That is a known duplication of this
+compatibility export. `PushNotification` below pushes exactly one. For anything that should
+survive a reconnection, use the server export instead.
 {% endhint %}
+
+</details>
+
+<details>
+
+<summary>PushNotification</summary>
+
+Pushes exactly one notification into the local phone.
+
+**Signature**
+
+```lua
+local ok = exports.nash_phone:PushNotification(appId, title, text, icon)
+```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `appId` | `string` | Application id the notification belongs to. Required |
+| `title` | `string` | Bold line. Required |
+| `text` | `string?` | Body |
+| `icon` | `string?` | Icon URL |
+
+**Returns**
+
+| Name | Type | Description |
+|---|---|---|
+| `ok` | `boolean` | `false` when `appId` or `title` is missing, `true` otherwise |
+
+**Behavior**
+
+- Purely local, like `SendNotification`: nothing is stored, nothing reaches the server.
+- `Config.NotifyStyle` is not consulted: the entry always goes to the phone itself.
+- It does not check `ToggleDisabled`.
+
+</details>
+
+<details>
+
+<summary>Notify</summary>
+
+Shows a short message the way `Config.NotifyStyle` says.
+
+**Signature**
+
+```lua
+exports.nash_phone:Notify(title, text, kind)
+```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `title` | `string` | Bold line |
+| `text` | `string?` | Body |
+| `kind` | `string?` | `ox_lib` notification type (`'inform'`, `'success'`, `'error'`...). Used only for the `ox_lib` toast, `'inform'` by default |
+
+**Returns**
+
+Nothing.
+
+**Behavior**
+
+| `Config.NotifyStyle` | Result |
+|---|---|
+| `'phone'` (default) | One phone notification filed under the `phone` application |
+| `'oxlib'` | One `ox_lib` toast, top right, and nothing in the phone |
+| `'both'` | The two |
+
+Purely local, and it does not check `ToggleDisabled`.
 
 </details>
 
@@ -354,7 +444,7 @@ local ok = exports.nash_phone:OpenApp(app, data)
 
 | Name | Type | Description |
 |---|---|---|
-| `ok` | `boolean` | `false` when the phone refused to open (taken away, dead, cuffed), `true` otherwise |
+| `ok` | `boolean` | `false` when the phone refused to open (taken away, dead, cuffed, item missing), `true` otherwise |
 
 **Behavior**
 
@@ -365,17 +455,24 @@ local ok = exports.nash_phone:OpenApp(app, data)
   code.
 - The id is not checked against the installed list. A store application opens even if the
   player never installed it, and an unknown id opens a placeholder screen.
+- The identifier of a custom application works too, including one declared with
+  `defaultApp = false` that has no icon on the player's home screen.
+- Like `ToggleOpen`, it checks the inventory item through the server when
+  `Config.UseItem = true`, and waits for that answer before it returns. Without the item, the
+  application order is not sent and `false` is returned.
 
-**Preinstalled ids**
+**Preinstalled ids** (with the shipped `config/apps.lua`)
 
 `phone`, `messages`, `camera`, `wallet`, `contacts`, `gallery`, `mail`, `notes`, `maps`,
 `weather`, `clock`, `calendar`, `facetime`, `music`, `safari`, `services`, `health`,
 `reminders`, `appstore`, `settings`, `passwords`
 
-**App Store ids**
+**App Store ids** (with the shipped `config/apps.lua`)
 
 `snake`, `tictactoe`, `calculator`, `stocks`, `compass`, `ticktok`, `instapic`, `playtube`,
-`snapz`, `chatapp`, `birdby`
+`snapz`, `chatapp`, `birdby`, `cindr`
+
+The `store` flag of each app in `config/apps.lua` decides which list it belongs to.
 
 **Example, a job dispatch opening the Services app**
 
@@ -443,6 +540,9 @@ Nothing.
 - This is the export for an application your server hands out as a reward or restricts to a
   job: use it with an App Store id, since preinstalled applications are not part of the
   installed list.
+- It also accepts the identifier of a custom application. This is the only way to put a custom
+  app declared with `defaultApp = false` on a player's home screen, since custom apps are not
+  listed in the App Store (see [Custom Applications](custom-apps.md)).
 
 </details>
 
@@ -496,7 +596,9 @@ local sent = exports.nash_phone:AddContact({ number = ..., firstname = ..., last
 - The display name is the first and last name joined by a space, trimmed. When both are
   empty, the number is used as the name.
 - The request goes to the server, which upserts the row: adding a number that is already in
-  the book updates the existing entry instead of creating a duplicate.
+  the book updates the existing entry instead of creating a duplicate. Its name is replaced,
+  an avatar you leave out clears the existing one, and any note the player wrote on that
+  contact is cleared.
 - `true` means "the request left", not "the contact was written". The server's answer is
   discarded.
 - The Contacts application reads its list when it opens, so a contact added while the app is
@@ -530,9 +632,12 @@ Nothing. The server's answer is discarded.
 
 **Behavior**
 
-- The URL is validated server-side: it must start with `http://` or `https://`, or be a
-  relative path with no scheme, no `..` and no leading `//`, and it must stay under 1024
-  characters. Anything else is rejected silently.
+- The URL is validated server-side: it must be an `https://` address of at most 1024
+  characters, whose host is listed in `Config.Gallery.Import.AllowedHosts` in
+  `config/main.lua` (`fivemanage.com` by default, subdomains included). Addresses on a host
+  starting with `api.` and presigned upload links are refused too. Anything else is rejected
+  without an error for your script; the server console prints one warning about the host list
+  the first time it happens.
 - The photo lands in the `Camera` album, like a picture taken with the phone.
 - A player is limited to 20 saved captures per 60 seconds, this export included.
 
@@ -766,9 +871,9 @@ local ok = exports.nash_phone:SetPhoneVariation(variation)
 
 - Purely visual and local. The player's saved setting is **not** overwritten, so a script that
   imposes a colour for a scene does not steal it permanently.
-- The colours are defined in `Config.Prop.skin.colors` in `config/main.lua`. Adding one there
-  requires a matching back-panel image, and the same id has to exist in the settings screen
-  and in the server whitelist.
+- The finishes are defined in `Config.Prop.skin.colors` in `config/main.lua`. You can change
+  the colours and the back image of each one there, but not add or rename an id: the Settings
+  screen and the server only accept these four.
 - The texture swap is local to the player: on their screen every phone takes that colour,
   including other players'. This is a known limit of the method.
 
@@ -814,7 +919,8 @@ local settings = exports.nash_phone:GetSettings()
 
 - The table is filled when the server hydrates the phone at player load. Calling this at
   resource start, before the framework reports the player, gives an empty table.
-- The keys are the ones listed in the server `GetSettings` block.
+- The keys are the ones listed in the server `GetSettings` block, `passcode` included (the
+  player's lock code in clear). Never send this table anywhere.
 - This is the live table, not a copy. Writing into it desynchronises the phone from what the
   server has stored.
 
@@ -951,7 +1057,6 @@ unmodified. None of them errors, logs, or changes anything on screen.
 
 {% hint style="info" %}
 Custom applications are not part of this list. `AddCustomApp`, `RemoveCustomApp`,
-`SendCustomAppMessage` and `GetCustomApps` are implemented in
-`client/modules/custom_apps.lua` and let another resource add its own application to the
-phone. They are documented separately in this section.
+`SendCustomAppMessage` and `GetCustomApps` are implemented and let another resource add its
+own application to the phone. They are documented in [Custom Applications](custom-apps.md).
 {% endhint %}

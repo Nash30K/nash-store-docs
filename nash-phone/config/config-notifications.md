@@ -50,7 +50,7 @@ session to session and only `retentionHours` still limits what stacks up.
 ### When `retentionHours` matters
 
 Only when `purgeOnJoin` is `false`. With the join purge on, everything has already been deleted
-and there is nothing left to date. It becomes your only safety net if you turn both purges off -
+and there is nothing left to date. It becomes your only safety net if you turn both purges off,
 for instance on a server where players want yesterday's alerts back. Set the duration you want
 then: `24` for a day, `168` for a week.
 
