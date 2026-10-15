@@ -42,6 +42,7 @@ up through `QBCore:Server:OnPlayerUnload`, which `Logout` fires before
 | `Framework.usableItem(name, cb)` | `exports.qbx_core:CreateUseableItem(name, cb)` |
 | `Framework.job(src)` | `PlayerData.job`, flattened like QBCore |
 | `Framework.setPhoneNumber(src, number)` | `exports.qbx_core:SetCharInfo(src, 'phone', number)` |
+| Character switch | `QBCore:Server:OnPlayerUnload` (server), `QBCore:Client:OnPlayerUnload` and `qbx_core:client:playerLoggedOut` (client) |
 | Death | `metadata.isdead` or `inlaststand`, read on the client through `qbx_core:client:onSetMetaData` |
 | Native inventory | **Not implemented:** returns `nil` on purpose |
 

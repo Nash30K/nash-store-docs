@@ -210,12 +210,11 @@ Yes, two ways:
 looping on `AddCustomApp` cannot flood the home screen. Full walkthrough in
 [Add a third-party application](guides/add-custom-app.md).
 
-{% hint style="warning" %}
-Custom apps are **not listed in the App Store**. Keep `defaultApp = true` (the default) so the
-app is placed on the home screen. With `defaultApp = false` the app is not placed there, it is
-removed from the home screens that already showed it, and players have no way to find it,
-unless another resource gives it to them with the client export
-`exports['nash_phone']:SetAppInstalled('<identifier>', true)`.
+{% hint style="info" %}
+Custom apps are listed in the App Store and the App Library like the stock App Store apps. With
+`defaultApp = true` (the default) each character gets the app on their home screen once; if
+they remove it or delete it, it does not come back on its own. With `defaultApp = false` the
+player gets it from the App Store.
 {% endhint %}
 
 </details>
@@ -232,9 +231,16 @@ replace `exports['lb-phone']` with `exports['nash_phone']`: one line. If it is e
 unmodifiable, the separate `nash_lbcompat` gateway answers to the expected name and forwards
 the calls.
 
-An app is only as portable as the exports it actually uses. LB Phone exports that are not
-wired exist so that calling them does not crash, but they do nothing and return nothing, so
-the app starts without crashing but without data.
+It is not a magic fix: an app is only as portable as what it actually uses. It will only partly
+work, or not at all, if it:
+
+- relies on the functions LB Phone injects into its page (`fetchNui`, `resourceName`, `getSettings`, `onSettingsChange`, or components such as pop-ups, context menus, photo and contact pickers, the camera) without a fallback of its own;
+- reads LB Phone's own database tables (for example `phone_phones` or `phone_messages`): NASH Phone stores its data in its own tables, so those queries find nothing;
+- calls LB Phone functions NASH Phone has no equivalent for: they return a neutral value, so the matching feature stays empty;
+- has a layout made for LB Phone's screen: NASH Phone's status bar and Dynamic Island cover the top 62 px.
+
+Test every third-party app on a test server before promising it to your players. Details:
+[Custom Apps, Apps written for LB Phone](developer-api/custom-apps.md#apps-written-for-lb-phone).
 
 </details>
 

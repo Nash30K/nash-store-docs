@@ -27,7 +27,7 @@ two places only:
 | What | Events | Why |
 | ---- | ------ | --- |
 | Death state | `QBCore:Player:SetPlayerData`, `qbx_core:client:onSetMetaData`, `QBCore:Client:OnPlayerLoaded` / `OnPlayerUnload`, plus one read of the player data from `qbx_core` or `qb-core` when the player loads | The `isdead` and `inlaststand` metadata of QBCore and QBOX, see [Death](#death-closes-the-phone) |
-| Character switch | `esx:onPlayerLogout`, `QBCore:Client:OnPlayerUnload` | Closes the phone when a player goes back to character selection |
+| Character switch | `esx:onPlayerLogout`, `QBCore:Client:OnPlayerUnload`, `qbx_core:client:playerLoggedOut` | Closes the phone when a player goes back to character selection. The phone's own server also sends `nash_phone:playerLogout` from the bridge's unload event, so a custom framework is covered too |
 
 A custom framework never requires a client-side change: on a framework where those events do not
 exist, they simply never fire.
@@ -191,8 +191,16 @@ On a multi-character server, a player can go back to character selection without
 disconnecting. The phone treats it like a departure: the call in progress ends, an InstaPic
 live stream stops, the player leaves duty in Services, the music stops, the number stops
 ringing this player, and a byCloud session is closed so the next character never reads the
-previous one's mailbox. The phone itself closes on the client. The signal is `esx:playerLogout`
-on ESX and `QBCore:Server:OnPlayerUnload` on QBCore and QBOX.
+previous one's mailbox. The signal is `esx:playerLogout` on ESX and
+`QBCore:Server:OnPlayerUnload` on QBCore and QBOX, or `playerUnloadedEvent` on a
+[custom framework](custom-framework.md#playerunloadedevent).
+
+On the client, the phone closes and locks, and **saves nothing for any character** until the
+next one is loaded: home layout, installed apps, settings, wallpaper, profile, Notes, Calendar,
+Reminders, contact photos, screen time, the byCloud keychain backup and the first-run setup.
+A change still waiting to be sent at that moment is dropped rather than written into the next
+character, and a server reply that arrives after the switch is ignored. The next character's
+load reloads their own layout, apps, settings, app data and screen time.
 
 ## Death closes the phone
 

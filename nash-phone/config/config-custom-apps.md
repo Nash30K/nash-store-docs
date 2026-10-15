@@ -9,7 +9,7 @@ interface.
 
 | Way | When to use it |
 | --- | -------------- |
-| **Here**, in `Config.CustomApps` | The simplest. You write the app in this file and it appears on every phone on the server. Required if you need `onServerUse` |
+| **Here**, in `Config.CustomApps` | The simplest. You write the app in this file and it is declared on every phone on the server. Required if you need `onServerUse` |
 | **From your own resource**, with the `AddCustomApp` export | Required if your app has an interface, because its HTML has to live in **your** resource |
 
 A working reference resource, `nash_exemple_app`, ships alongside the phone. It is three Lua
@@ -40,7 +40,8 @@ That is the whole setup. Your interface now has `fetchNui`, `onNuiEvent`, `onSet
 
 Call `AddCustomApp` on the **client**, once the player is loaded. Apps registered by a
 third-party resource are removed automatically when that resource stops, so an icon never
-survives a `stop` and opens an iframe onto a file that is no longer served.
+survives a `stop` and opens an iframe onto a file that is no longer served. Players keep the
+app installed: when the resource starts again, its icon comes back in the same place.
 
 ## Declaring in this file
 
@@ -81,20 +82,45 @@ works without an explicit `identifier` (`id` is also accepted in place of `ident
 | ----- | ----------- |
 | `identifier` | **Required.** Unique identifier, never shown to the player. It is the key: two apps cannot share one, and declaring the same identifier again replaces the app |
 | `name` | Name displayed under the icon. Falls back to `identifier` |
-| `icon` | Icon URL. For an image in **your** resource: `'https://cfx-nui-' .. GetCurrentResourceName() .. '/ui/icon.png'`. Without it, the icon is a coloured tile with the first letter of `name` |
+| `icon` | Icon URL. For an image in **your** resource: `'https://cfx-nui-' .. GetCurrentResourceName() .. '/ui/icon.png'`. Without it, or when the link fails to load, the icon is a coloured tile with the first letter of `name` |
 | `ui` | Path to your interface's HTML, **prefixed with your resource name**: `'my-resource/ui/index.html'`. Without it, tapping the app runs `onUse` and `onServerUse` and opens a short screen saying the app has no interface |
-| `defaultApp` | `true` (default) = placed on every player's home screen, including players who already have a phone (it is added on the last page). `false` = see the warning below |
+| `defaultApp` | `true` (default) = installed and placed on the home screen (last page) **once per character**, including characters who already have a phone. `false` = the player gets it from the App Store. See below |
+| `game` | `true` = listed under "Server Games" in the App Store and filed under Games in the App Library. Otherwise "Server Apps" and Utilities |
+| `description` | Text of the app's App Store page, also shown under its name in App Store lists |
+| `developer` | Publisher shown in the App Store. Defaults to "This server" |
+| `size` | Size in **KB**, shown in the App Store. Without it, no size is shown |
+| `images` | Image URLs, shown as screenshots on the App Store page |
+| `price` | Nothing is ever charged. `0` or absent shows Free on the App Store page, above `0` the price row is hidden |
 | `landscape` | `true` = the interface is displayed rotated, in landscape |
 | `onUse` | Function called **client-side** when the app is opened |
 | `onServerUse` | Function called **server-side** when the app is opened. Receives the player's `source` |
-| `description`, `developer`, `game`, `size`, `images`, `price`, `keepOpen` | Accepted for LB Phone compatibility, so an LB app's table works unchanged, but not used: custom apps have no App Store page, nothing is ever charged, and opening an app never closes the phone anyway |
+| `keepOpen` | Accepted for LB Phone compatibility, so an LB app's table works unchanged, but not used: opening an app never closes the phone anyway |
 
-{% hint style="warning" %}
-**Custom apps are not listed in the App Store.** With `defaultApp = false`, the app is not placed
-on the home screen, and it is removed from the home screens where it already was (unless the
-player had installed it). Since it cannot be downloaded either, players have **no way to reach
-it**. Keep `defaultApp = true` (or leave it out) for any app players should use.
-{% endhint %}
+## App Store, App Library and home screen
+
+Custom apps are listed in the App Store and behave like the phone's own App Store apps. Each
+character's choices are saved on the server, in `nash_phone_home`.
+
+| `defaultApp` | What the player gets |
+| ------------ | -------------------- |
+| `true` (or absent) | Installed and placed on the home screen the first time the app is declared while that character is loaded. **Only once:** an icon the player removed, or an app they deleted, does not come back on its own, after a reconnect or a server restart |
+| `false` | Nothing until the player taps Get on the app's App Store page |
+
+- **App Store:** under "Server Apps" on the Today tab, and under "Server Apps" or "Server Games"
+  on the Apps and Games tabs. Get, Open and Delete work as for the phone's own apps.
+- **App Library:** lists the app once it is installed, even when it is off the home screen. A
+  long press on its icon offers "Add to Home Screen" (when the icon is off the home screen) and
+  "Delete App".
+- **Home screen:** the minus button offers "Remove from Home Screen" (the app stays installed and
+  in the App Library) or "Delete App" (uninstalled until downloaded again).
+- Switching an app from `false` to `true` later gives it, once, to the characters who never
+  installed or deleted it.
+- An app whose identifier is already used by a built-in or App Store app (`notes`, `snapz`...) is
+  left out of the App Store and never installed automatically.
+
+An app declared here is declared on every client, so every player sees it in the App Store. To
+offer an app to some players only, declare it from your own resource, only on their clients:
+see [Custom Applications](../developer-api/custom-apps.md#installation-and-the-app-store).
 
 ## The three traps that cost the most time
 
@@ -232,17 +258,34 @@ does.
 ## Applications written for another phone
 
 The field names and the function names above are deliberately LB Phone's: an app written for LB
-Phone declares itself here without changing anything in its table or in its interface code.
+Phone usually declares itself here without changing anything in its table or in its interface
+code.
 
-The only obstacle is the resource name it calls in its Lua.
+The first obstacle is the resource name it calls in its Lua.
 
-- **If you can open its file:** replace that name with `nash_phone`. One line.
+- **If you can open its file:** replace `exports['lb-phone']` with `exports['nash_phone']`, and
+  `'lb-phone'` wherever the app waits for the phone (`GetResourceState`, `dependency` in its
+  `fxmanifest.lua`).
 - **If it is escrowed:** use the `nash_lbcompat` resource, shipped separately, which answers to
   the expected name and forwards the calls. Read its `README.md` first: it has to be renamed,
   and it must never run alongside the original resource.
 
+An LB app declared with `defaultApp = false` is listed in the App Store, where players get it as
+they would on LB Phone.
+
 {% hint style="warning" %}
-An app is only as portable as the functions it uses. The table above covers the interface side.
+**Not a magic fix.** Compatibility depends on what each app uses. Most simple LB Phone apps work as they are: declaration, icon, live messages, calls to their own resource, notifications, phone number. An app will only partly work, or not at all, if it:
+
+- relies on the functions LB Phone injects into its page (`fetchNui`, `resourceName`, `getSettings`, `onSettingsChange`, or components such as pop-ups, context menus, photo and contact pickers, the camera) without a fallback of its own;
+- reads LB Phone's own database tables (for example `phone_phones` or `phone_messages`): NASH Phone stores its data in its own tables, so those queries find nothing;
+- calls LB Phone functions NASH Phone has no equivalent for: they return a neutral value, so the matching feature stays empty;
+- has a layout made for LB Phone's screen: NASH Phone's status bar and Dynamic Island cover the top 62 px.
+
+Test every third-party app on a test server before promising it to your players.
+{% endhint %}
+
+{% hint style="info" %}
+The table above covers the interface side.
 For the Lua side, see the [Developer API](../developer-api/README.md): it lists the exports
 that are really wired. The others return neutral values, so the app starts without crashing but
 without data.

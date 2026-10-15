@@ -79,7 +79,9 @@ The server event your framework fires when a player goes back to character selec
 disconnecting, with the server ID as its **first argument** (it is read the same way as
 `playerLoadedEvent` above). The phone then ends the call in progress, stops the number from
 ringing this player, stops the music and an InstaPic live, closes a byCloud session and takes
-the player off duty, exactly as on a disconnection.
+the player off duty, exactly as on a disconnection. It also closes the phone on that player's
+client, which then saves nothing (layout, settings, notes, screen time...) until the next
+character is loaded, so nothing from the old character is written into the new one.
 
 Leave it `nil` on a framework without multiple characters: a real disconnection is already
 handled by `playerDropped`. On a multi-character framework, leaving it `nil` lets the next

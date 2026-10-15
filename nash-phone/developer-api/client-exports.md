@@ -540,9 +540,12 @@ Nothing.
 - This is the export for an application your server hands out as a reward or restricts to a
   job: use it with an App Store id, since preinstalled applications are not part of the
   installed list.
-- It also accepts the identifier of a custom application. This is the only way to put a custom
-  app declared with `defaultApp = false` on a player's home screen, since custom apps are not
-  listed in the App Store (see [Custom Applications](custom-apps.md)).
+- It also accepts the identifier of a custom application, installed or uninstalled exactly as
+  from the App Store, and saved as that character's choice: an app declared with
+  `defaultApp = true` that you uninstall this way is not given back automatically (see
+  [Custom Applications](custom-apps.md#installation-and-the-app-store)).
+- Installing an app that is already installed does nothing, even when its icon was taken off
+  the home screen.
 
 </details>
 

@@ -642,7 +642,7 @@ The app id is still `safari` (it is the key in `config/apps.lua`). It is an iden
 
 Two real, playable games with no server side. Snake speeds up as the score climbs. Tic-Tac-Toe plays against an AI that blocks and punishes mistakes, or two players on the same phone. Nothing is stored, nothing is shared, no leaderboards.
 
-Both are App Store downloads by default and are filed under the Games category. Like every app in the store, they are credited to `Config.Brand.studio` (`'Nash Store'` by default).
+Both are App Store downloads by default and are filed under the Games category. Like every stock app in the store, they are credited to `Config.Brand.studio` (`'Nash Store'` by default).
 
 </details>
 
@@ -695,15 +695,26 @@ It needs `Config.UseItem = true` and an inventory that gives items a serial numb
 
 <summary>App Store</summary>
 
-Browsing, install and uninstall for the apps marked `store = true`, plus a Today tab and an account page listing what the player installed.
+Browsing, install and uninstall for the apps marked `store = true` and for custom apps, plus a Today tab and an account page listing what the player installed.
 
-**Real, and free.** Installs are persisted in `nash_phone_home` alongside the home layout and dock, so a player finds their apps again after a reconnect. **There is no in-game money price for stock apps**: the App Store never renders a price. Custom apps declare a `price` field for LB Phone compatibility, but nothing in the phone charges for it.
+**Real, and free.** Installs are persisted per character in `nash_phone_home` alongside the home layout and dock, so a player finds their apps again after a reconnect. **Nothing is ever charged**: the App Store never shows an amount. Every page reads Free, except a custom app declared with a `price` above 0, whose price row is hidden.
 
 **Generated store pages.** When you push a preinstalled system app into the store (`store = true` on an app that ships preinstalled), it has no hand-written store page. The phone composes one from what it knows: the icon, the translated or overridden name, the studio from `Config.Brand.studio`, and the icon gradient in place of screenshots.
 
-Every store listing, stock or generated, names `Config.Brand.studio` as its publisher, as it is, with nothing added (`'Nash Store'` by default). Setting `studio = 'Vespucci'` shows "Vespucci" on every page.
+Every stock or generated listing names `Config.Brand.studio` as its publisher, as it is, with nothing added (`'Nash Store'` by default). Setting `studio = 'Vespucci'` shows "Vespucci" on every page. Custom apps show their own `developer` instead, or "This server".
 
-**Custom apps are not listed in the App Store.** The store only lists stock apps. A custom app is either placed on the home screen (`defaultApp = true`) or not reachable at all: see [Custom apps](#custom-apps).
+**Custom apps** are listed under "Server Apps" on the Today tab, and under "Server Apps" or "Server Games" on the Apps and Games tabs, with their own icon, description, size and screenshots, and no ratings. They also show in search and on the account page. See [Custom apps](#custom-apps).
+
+**Removing an app.** On an installed store or custom app, the minus button of the home screen (or of a folder) opens the iOS alert. "Remove from Home Screen" takes the icon away and keeps the app installed, in the App Library, Spotlight and the App Store. "Delete App" uninstalls it, as Delete does in the App Store. On a preinstalled app, the minus button takes the icon off the home screen with no alert; the app stays in the App Library. An icon taken off the home screen comes back with **Add to Home Screen** in the App Library.
+
+**App Library.** It lists the preinstalled apps plus the apps the player installed, store or custom. A store app that is not installed is not in it. A custom game is filed under Games, any other custom app under Utilities.
+
+A short tap opens the app. A long press (half a second) on an icon, in a category tile, in an opened category or in the search results, blurs the background, lifts the icon and opens an iOS context menu next to it:
+
+- **Add to Home Screen** appears when the app is not on the home screen (pages, dock or a folder). The icon goes after the last item of the last page, or on a new page when that one is full. The library closes and the home screen slides to that page. The layout is saved per character, like any other home screen change.
+- **Delete App** appears on an installed store or custom app. If the app is also on the home screen, it opens the same alert as the minus button. Otherwise a two-button alert (Delete, Cancel) uninstalls it.
+
+A preinstalled app that is already on the home screen has neither entry: a long press on it opens no menu and no app.
 
 </details>
 
@@ -752,7 +763,7 @@ A Face ID-locked keychain: entries with site, username, password, favourites, se
 
 You can add your own apps in two ways, both documented in `config/custom_apps.lua`.
 
-1. **In the config file**, in `Config.CustomApps`. Simplest, and with `defaultApp` left at `true` the app appears on every phone on the server.
+1. **In the config file**, in `Config.CustomApps`. Simplest, and with `defaultApp` left at `true` every character gets the app on their home screen, once.
 2. **From your own resource**, with the client export, once the player is loaded:
 
 ```lua
@@ -769,24 +780,32 @@ Use the export form when your app has a UI, because its HTML has to live in your
 | ----- | ------- |
 | `identifier` | **Required.** Unique key, never shown to the player |
 | `name` | Display name under the icon |
-| `icon` | Icon URL. For an image in your resource: `'https://cfx-nui-' .. GetCurrentResourceName() .. '/ui/icon.png'`. Without it, the icon is the first letter of the name on a coloured background |
+| `icon` | Icon URL. For an image in your resource: `'https://cfx-nui-' .. GetCurrentResourceName() .. '/ui/icon.png'`. Without it, or when the link fails to load, the icon is the first letter of the name on a coloured background |
 | `ui` | Path to your HTML, **prefixed with your resource name**: `'my-resource/ui/index.html'`. Without it the app only fires `onUse` when tapped |
-| `defaultApp` | `true` (default) = placed on every player's home screen. `false` = not placed on the home screen, and **removed** from home screens that already show it, unless the player has it installed |
+| `defaultApp` | `true` (default) = installed and placed on the home screen **once per character**. `false` = the player gets it from the App Store |
+| `game` | `true` = "Server Games" in the App Store, Games in the App Library. Otherwise "Server Apps" and Utilities |
+| `description`, `developer`, `size`, `images` | Shown on the app's App Store page. `size` is in KB; `developer` defaults to "This server" |
+| `price` | Nothing is ever charged. `0` or absent shows Free, above `0` the price row is hidden |
 | `landscape` | `true` displays the app in landscape |
 | `onUse` | Client-side function called when the app opens |
 | `onServerUse` | Server-side function called when the app opens, receives the player's `source` |
-| `description`, `developer`, `images`, `size`, `game`, `price`, `keepOpen` | Accepted so that an LB Phone declaration works unchanged, but **not displayed or used** by the phone: custom apps have no App Store page |
+| `keepOpen` | Accepted so that an LB Phone declaration works unchanged, but not used |
 
-{% hint style="warning" %}
-**Custom apps are not listed in the App Store.** With `defaultApp = false`, a player has no way to find the app in the phone. The only way to give it to someone is the client export `exports.nash_phone:SetAppInstalled('<identifier>', true)`, called from another resource (a shop, an item, a job script): the app is then installed for that character, placed on their home screen, and kept after a reconnect.
+**Where players find it.** Custom apps behave like the stock App Store apps, and each character's choices are saved in `nash_phone_home`.
+
+- With `defaultApp = true`, the app is installed and placed the first time it is declared while the character is loaded. Only once: an icon the player removed, or an app they deleted, does not come back on its own, after a reconnect or a server restart.
+- With `defaultApp = false`, the app waits in the App Store until the player taps Get.
+- When the resource that declared the app stops, the icon and listings disappear but the app stays installed. When the resource starts again, the icon comes back in the same place.
+- An app whose identifier is already used by a stock app (`notes`, `snapz`...) is left out of the App Store and never installed automatically.
+
+{% hint style="info" %}
+The App Store lists every app declared on the player's client. To offer an app to some players only (a shop, an item, a job), declare it from your own resource only on their clients. The client export `exports.nash_phone:SetAppInstalled('<identifier>', true)` also installs it for a character without the App Store, places it on their home screen and keeps it after a reconnect.
 {% endhint %}
 
 **LB Phone compatibility.** The field names above are LB Phone's, deliberately: an app written for LB Phone declares itself here without changing its table. Two things to know before relying on it:
 
-- The app's Lua calls `exports['lb-phone']`. If you can edit the app, replace that string with `exports['nash_phone']` and you are done. If the app is escrowed and cannot be modified, you need the `nash_lbcompat` bridge, shipped separately.
-- An app is only as portable as the exports it uses. Only some of the LB Phone export surface is actually implemented; the rest return neutral values, so the app launches without crashing but without data.
-
-`price` in particular is accepted for LB Phone compatibility, but **nothing charges for it**.
+- The app's Lua calls `exports['lb-phone']`. If you can edit the app, replace that string with `exports['nash_phone']`, and replace `'lb-phone'` wherever the app waits for the phone (`GetResourceState`, `dependency` in its `fxmanifest.lua`). If the app is escrowed and cannot be modified, you need the `nash_lbcompat` bridge, shipped separately.
+- It is not a magic fix. An app is only as portable as what it uses: apps that rely on the functions LB Phone injects into their page, read LB Phone's own database tables, or call LB functions NASH Phone has no equivalent for, only partly work. See [Custom Applications](../developer-api/custom-apps.md#apps-written-for-lb-phone), and test each app before promising it to players.
 
 Custom apps are also reachable from `exports.nash_phone:SendCustomAppMessage(src, identifier, data)` on the server side, and the phone hosts their UI in an isolated frame (`custom_app_bridge/nash-bridge.js`).
 

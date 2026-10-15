@@ -103,10 +103,20 @@ end)
 
 The app is removed automatically when your resource stops: otherwise its icon would stay on
 the home screen and opening it would load an iframe pointing at a file that is no longer
-served.
+served. Removing only hides it: players keep it installed, and when your resource starts again
+the icon comes back in the same place.
 
 ```lua
 exports['nash_phone']:RemoveCustomApp('nash_example')
+```
+
+The phone keeps declared apps in memory only: if `nash_phone` restarts, declare your app again
+when it starts.
+
+```lua
+AddEventHandler('onClientResourceStart', function(res)
+    if res == 'nash_phone' then declareMyApp() end
+end)
 ```
 
 </details>
@@ -153,13 +163,45 @@ works without an explicit `identifier`.
 | ----- | ---- | ----------- |
 | `identifier` | `string` | **Required.** Unique id, never shown to the player. Declaring a second app with the same identifier replaces the first |
 | `name` | `string` | Name under the icon. Falls back to `identifier` |
-| `icon` | `string` | Icon URL. For an image in your resource: `'https://cfx-nui-' .. GetCurrentResourceName() .. '/ui/icon.png'`. Without it, the icon is a coloured tile with the first letter of the name |
-| `ui` | `string` | Path to your interface's HTML, **prefixed with your resource name**: `'my-resource/ui/index.html'`. Without it, tapping the icon calls `onUse` and shows a short screen saying the app has no interface |
-| `defaultApp` | `boolean` | Default `true`: the icon is placed on the last page of the home screen. `false`: the app is not placed on the home screen, and it is removed from home screens where it already was (unless the player installed it). Custom apps are **not** listed in the App Store, so with `false` players have no way to reach the app |
+| `icon` | `string` | Icon URL. For an image in your resource: `'https://cfx-nui-' .. GetCurrentResourceName() .. '/ui/icon.png'`. Without it, or when the link fails to load, the icon is a coloured tile with the first letter of the name |
+| `ui` | `string` | Path to your interface's HTML, **prefixed with your resource name**: `'my-resource/ui/index.html'`. A value that already starts with `https://`, `http://` or `nui://` is used as is. Without it, tapping the icon calls `onUse` and shows a short screen saying the app has no interface |
+| `defaultApp` | `boolean` | Default `true`: installed and placed on the last page of the home screen **once per character**. `false`: the player gets it from the App Store |
+| `game` | `boolean` | `true` = listed under "Server Games" in the App Store and filed under Games in the App Library. Otherwise "Server Apps" and Utilities |
+| `description` | `string` | Text of the app's App Store page |
+| `developer` | `string` | Publisher shown in the App Store. Defaults to "This server" |
+| `size` | `number` | Size in **KB**, shown in the App Store. Without it, no size is shown |
+| `images` | `string[]` | Image URLs, shown as screenshots on the App Store page |
+| `price` | `number` | Nothing is ever charged. `0` or absent shows Free, above `0` the price row is hidden |
 | `landscape` | `boolean` | `true` = the app displays in landscape |
 | `onUse` | `function` | Called **client side** when the app is opened |
 | `onServerUse` | `function` | Called **server side** when the app is opened. Receives the player's `source`. Only works from `Config.CustomApps` (see below) |
-| `description`, `developer`, `game`, `size`, `images`, `price`, `keepOpen` | | Accepted, so that a table written for LB Phone declares without errors, but **not used** by NASH Phone in the current release: custom apps have no App Store page to show them on, and `keepOpen` changes nothing |
+| `keepOpen` | `boolean` | Accepted, so that a table written for LB Phone declares without errors, but changes nothing |
+| Any other field | | Ignored without error, for example `fixBlur` |
+
+`AddCustomApp` returns `true`, or `false` and the reason it refused the app (the same text it
+prints in the F8 console).
+
+### Where players find it
+
+A custom app behaves like the phone's own App Store apps, and each character's choices are
+saved on the server.
+
+- **`defaultApp = true`** (or absent): the app is installed and placed on the home screen the
+  first time it is declared while the character is loaded. Only once: an icon the player
+  removed, or an app they deleted, does not come back on its own.
+- **`defaultApp = false`**: the app waits in the App Store until the player taps Get.
+- **App Store**: every declared app is listed under "Server Apps" or "Server Games", with Get,
+  Open and Delete.
+- **App Library**: an installed app is listed there, even when it is off the home screen. A
+  long press on its icon offers "Add to Home Screen" (when the icon is off the home screen) and
+  "Delete App".
+- **Home screen**: the minus button offers "Remove from Home Screen" (still installed, still in
+  the App Library) or "Delete App" (uninstalled until downloaded again).
+- Pick an identifier no built-in or App Store app uses (`notes`, `snapz`...): a clashing app is
+  left out of the App Store and never installed automatically.
+
+Details in
+[Custom Applications](../developer-api/custom-apps.md#installation-and-the-app-store).
 
 {% hint style="warning" %}
 **`onServerUse` only works for apps declared in `Config.CustomApps`.** A Lua function does not
@@ -231,6 +273,17 @@ onNuiEvent('tick', (d) => {
 })
 ```
 
+The same table is also posted raw, for apps written for LB Phone that listen to `message`
+themselves:
+
+```js
+window.addEventListener('message', (e) => {
+  if (e.data?.action === 'tick') console.log(e.data.data.hour)
+})
+```
+
+The bridge ignores that raw copy, so `onNuiEvent` fires once.
+
 ## 5. The bridge API
 
 Loaded by that one `<script>` tag, **before** your own script. It is served by the phone, so
@@ -254,7 +307,7 @@ your app follows its updates without copying anything. To freeze it instead, cop
 | `setEmojiPickerVisible` | available |
 | `setGallery` | available |
 | `setFullscreenImage` | available |
-| `setHomeIndicatorVisible` | available |
+| `setHomeIndicatorVisible` | accepted, no effect yet |
 | `saveToGallery` | available |
 | `uploadMedia` | not wired yet |
 | `setShareComponent` | not wired yet |
@@ -322,29 +375,62 @@ player's home screen. Past the ceiling the phone refuses and says so:
 Turn `debug = true` on when an app does not show up and you want to know whether it was even
 declared.
 
-## Applications written for another phone
+## Applications written for LB Phone
 
-The field and function names above are deliberately the ones used by the most widespread
-custom-app convention (LB Phone): an app written for that phone declares here without any
-change to its table or to its interface code.
+The field and function names above are deliberately LB Phone's, and live messages reach the
+page in both formats (`onNuiEvent` and a plain `message` listener). An app written for LB Phone
+runs here without changes to its table or to its interface code. Only the resource name it
+calls in its Lua has to be dealt with, in one of two ways.
 
-The only obstacle is the resource name it calls in its own Lua.
+### If you can open its Lua
 
-- **If you can open its file**: replace that name with `nash_phone`. One line. This is the
-  recommended route: no extra resource, no name collision.
-- **If it is escrow-protected**: use the `nash_lbcompat` resource, shipped separately, which
-  answers to the expected name and forwards the calls. Read its `README.md` first: it has to be
-  **renamed** to the name the app calls (FiveM resolves `exports['a-name']` by folder name), it
-  must start **after** `nash_phone`, and it must never run alongside the original resource
-  (two resources cannot share a name, and the server would start one of them at random).
+1. Replace `exports['lb-phone']` with `exports['nash_phone']`.
+2. Replace `'lb-phone'` too wherever the app waits for the phone: `GetResourceState`, a resource
+   name check in `onResourceStart`, `dependency` in its `fxmanifest.lua`. Otherwise it waits for
+   a resource that never starts.
+3. Start it after `nash_phone`.
 
-An app is only as portable as the functions it uses. The table above, plus the
-[Developer API](../developer-api/README.md) for the Lua side, say exactly what you can rely on.
+This is the recommended route: no extra resource, no name collision.
+
+### If it is escrowed
+
+1. Take the `nash_lbcompat` resource, shipped separately, and **rename its folder `lb-phone`**.
+   FiveM resolves `exports['lb-phone']` by folder name.
+2. Start it **after** `nash_phone`, and the app after it:
+
+   ```cfg
+   ensure nash_phone
+   ensure lb-phone   # the nash_lbcompat folder, renamed
+   ensure my_lb_app
+   ```
+
+3. **Never** run it next to the real `lb-phone`: two resources cannot share a name.
+4. If the app does not react, set `debug = true` in the compat's `config.lua`: every forwarded
+   call is printed, so you see at once which one is missing.
+
+The compat forwards the calls to `nash_phone`, records the app's own resource as its owner (its
+icon goes when that resource stops), and declares its apps again whenever `nash_phone` restarts.
+An older copy of the compat recorded every app as its own: replace it with the current one.
+
+### What to check
+
+- **LB's injected globals** (`fetchNui`, `resourceName`, `appName`, `settings`, `getSettings`,
+  `onSettingsChange`, `components`, `createCall`) do not exist on the page. An app that relies
+  on them with no fallback breaks. If you can edit its `index.html`, add the bridge `<script>`
+  tag: it provides all of them except `getSettings`.
+- **The top 62 px** are covered by the status bar and the Dynamic Island. Check the app's
+  layout.
+- **`defaultApp = false`** puts the app in the App Store instead of on the home screen, as on
+  LB Phone.
+
+The full list, with what the compat does, is in
+[Custom Applications](../developer-api/custom-apps.md#apps-written-for-lb-phone).
 
 ## How to know it works
 
 1. Start your resource after `nash_phone`. The icon appears on the last page of the home
-   screen (with `defaultApp = true`, the default).
+   screen (with `defaultApp = true`, the default), and the app is listed in the App Store under
+   "Server Apps". With `defaultApp = false`, get it from the App Store first.
 2. Open the app. Your HTML renders inside the phone frame, with the status bar over it.
 3. If the page is blank, in this order: check that `ui` starts with your resource name, that
    `files{}` declares your HTML, and that the file path is right. None of those three produces
@@ -352,4 +438,7 @@ An app is only as portable as the functions it uses. The table above, plus the
 4. Set `Config.CustomAppsSettings.debug = true` and restart: every add and removal is printed,
    which tells you whether the declaration ever reached the phone.
 5. Switch the phone to light mode from Control Center. Your app should follow.
-6. Stop your resource with the phone open: the icon disappears on its own.
+6. Stop your resource with the phone open: the icon disappears on its own. Start it again: the
+   icon comes back in the same place.
+7. Remove the icon from the home screen, then restart your resource: it stays off the home
+   screen, and the app is still in the App Library.

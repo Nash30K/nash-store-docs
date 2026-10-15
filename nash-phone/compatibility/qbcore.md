@@ -130,8 +130,8 @@ number QBCore generated when the character was created. Off by default.
 
 A QBCore character who dies is revived and plays an animation, so the game does not see them as
 dead. The phone reads `isdead` and `inlaststand` instead: on the ground, even in last stand, the
-phone closes and cannot be opened. Going back to character selection ends the call in progress
-and closes the phone. See the [Compatibility Overview](README.md#character-switch).
+phone closes and cannot be opened. Going back to character selection ends the call in progress,
+closes the phone and stops it saving anything until the next character is loaded. See the [Compatibility Overview](README.md#character-switch).
 
 ## Manual steps
 

@@ -143,8 +143,9 @@ a little later.
 `NashFw.custom.playerUnloadedEvent` names the server event fired when a player goes back to
 character selection without disconnecting, with the server ID as first argument. The phone
 then cleans up as on a disconnection: it ends the call in progress, closes the byCloud session,
-stops the music, takes the player off duty in Services and ends their live stream. Leave it
-`nil` without multiple characters.
+stops the music, takes the player off duty in Services and ends their live stream. On the
+player's client, the phone closes and saves nothing until the next character is loaded. Leave
+it `nil` without multiple characters.
 
 {% hint style="warning" %}
 `identifier` must be **stable over time** for a given character. It is what ties a player to

@@ -35,7 +35,7 @@ end)
 **When it fires**
 
 - On every open, including opens triggered by the item, the `ToggleOpen` export, the `nash_phone:open` net event, and an incoming call that takes the phone out on its own.
-- On every close, including the ones the phone forces on itself: the player dies, the phone gets confiscated through `ToggleDisabled`, or the character logs out (`esx:onPlayerLogout`, `QBCore:Client:OnPlayerUnload`).
+- On every close, including the ones the phone forces on itself: the player dies, the phone gets confiscated through `ToggleDisabled`, or the character logs out (`esx:onPlayerLogout`, `QBCore:Client:OnPlayerUnload`, `qbx_core:client:playerLoggedOut`, or the phone's own `nash_phone:playerLogout`, which its server sends from the framework's unload event).
 - Not when `nash_phone` itself stops: the phone is torn down without firing the event.
 
 **Ordering:** the event fires **before** the 3D prop is attached. Attaching the prop blocks for up to 3.5 seconds while the model streams in, so the event was deliberately moved ahead of it; do not assume the prop exists in your handler.
