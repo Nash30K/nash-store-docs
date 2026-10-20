@@ -19,7 +19,7 @@
 | Resource | Purpose |
 | -------- | ------- |
 | `ox_target` | Cleanest interaction mode for bank / ATM / business NPCs. `ox_lib` textUI and default 3D text are also supported — configurable in `shared/config.lua` |
-| A **phone** | Enables the two banking phone apps — `lb-phone` or `qs-smartphone-pro` (auto-detected) |
+| A **phone** | Enables the two banking phone apps — `nash_phone`, `lb-phone`, `qs-smartphone` or `qs-smartphone-pro` (auto-detected) |
 
 ## Compatibility matrix
 

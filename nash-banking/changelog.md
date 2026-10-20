@@ -6,6 +6,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/) and the proje
 
 ---
 
+## [1.1.1] - NASH Phone support
+
+### Added
+
+- **NASH Phone support** - `nash_banking_phone` and `nash_businessbanking_phone` now auto-detect `nash_phone` and register through its custom app API (`AddCustomApp` / `SendCustomAppMessage`). Detection order: `nash_phone` → `lb-phone` → `qs-smartphone` → `qs-smartphone-pro`. Prints `[Nash Banking Phone] Phone system: nash` in F8 on boot. With `DefaultApp = true` the apps are installed on the home screen once per character, and listed in the App Store under "Server Apps".
+- **Phone notifications on NASH Phone** - payment received / sent notifications (TPE, transfers) now go through `exports.nash_phone:SendNotification` when NASH Phone is running. Previously these notifications only existed for LB Phone.
+
+### Changed
+
+- The phone apps' `fetchNui` now resolves their own resource from the page origin (`cfx-nui-<resource>`) when the host phone doesn't inject a `fetchNui` helper. Required on NASH Phone, where the app runs without the `nash-bridge.js` script. LB Phone and Quasar behavior is unchanged.
+
+---
+
 ## [1.1.0] - Cumulative daily caps + ATM tier enforcement
 
 ### Added

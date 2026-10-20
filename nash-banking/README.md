@@ -1,13 +1,13 @@
 # nash_banking
 
-**Latest release: v1.1.0** — see the [Changelog](changelog.md) for what's new.
+**Latest release: v1.1.1** — see the [Changelog](changelog.md) for what's new.
 
-nash_banking is a premium, feature-complete banking system for FiveM. It ships with a desktop UI, two phone apps (LB Phone / Quasar Phone), a TPE (payment terminal) system, cards, investments, crypto, businesses, savings, subscriptions, and an admin panel.
+nash_banking is a premium, feature-complete banking system for FiveM. It ships with a desktop UI, two phone apps (NASH Phone / LB Phone / Quasar Phone), a TPE (payment terminal) system, cards, investments, crypto, businesses, savings, subscriptions, and an admin panel.
 
 ## Features
 
 - Desktop banking UI (React + Tailwind)
-- Phone apps: personal banking & business banking (LB Phone, Quasar Phone V3, Quasar Phone Pro - auto-detected)
+- Phone apps: personal banking & business banking (NASH Phone, LB Phone, Quasar Phone V3, Quasar Phone Pro - auto-detected)
 - ATM interactions with animated card insertion, per-action toggles
 - TPE payment system (in-script export + P2P via inventory item), with server-side hooks to route receipts to an external business system
 - Physical & virtual cards with limits
@@ -27,7 +27,7 @@ nash_banking is a premium, feature-complete banking system for FiveM. It ships w
 - oxmysql
 - An inventory (ox_inventory / qs-inventory / qb-inventory / custom)
 - A framework (ESX / QBCore / QBOX / custom)
-- (optional) A phone: lb-phone, qs-smartphone (Quasar V3), or qs-smartphone-pro
+- (optional) A phone: nash_phone, lb-phone, qs-smartphone (Quasar V3), or qs-smartphone-pro
 
 ## Links
 

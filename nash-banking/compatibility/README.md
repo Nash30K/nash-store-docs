@@ -8,7 +8,7 @@ Nash Banking uses two independent bridges — one for the framework, one for the
 |---|---|
 | **Framework** | `es_extended` (ESX) · `qbx_core` (QBOX) · `qb-core` (QBCore) |
 | **Inventory** | `ox_inventory` · `qs-inventory` · `qb-inventory` |
-| **Phone** (optional) | `lb-phone` · `qs-smartphone-pro` |
+| **Phone** (optional) | `nash_phone` · `lb-phone` · `qs-smartphone` · `qs-smartphone-pro` |
 
 ## Bridge architecture
 
@@ -64,7 +64,7 @@ Config.Inventory = 'auto' -- 'auto' | 'ox_inventory' | 'qs-inventory' | 'qb-inve
 
 ## Phone detection
 
-The two optional phone apps (`nash_banking_phone`, `nash_businessbanking_phone`) auto-detect `lb-phone` first, then `qs-smartphone-pro`. See [Phone Apps](../installation/lb-phone.md).
+The two optional phone apps (`nash_banking_phone`, `nash_businessbanking_phone`) auto-detect `nash_phone` first, then `lb-phone`, `qs-smartphone` (Quasar V3) and `qs-smartphone-pro`. See [Phone Apps](../installation/lb-phone.md).
 
 ## Extending the bridges
 

@@ -1,4 +1,4 @@
-# Phone Apps (LB Phone & Quasar Phone Pro) — optional
+# Phone Apps (NASH Phone, LB Phone, Quasar Phone) - optional
 
 Nash Banking ships two phone apps:
 
@@ -9,10 +9,10 @@ Both are independent resources that depend on `nash_banking` being started first
 
 ## Requirements
 
-- One phone resource started: **`lb-phone`** *or* **`qs-smartphone-pro`**
+- One phone resource started: **`nash_phone`**, **`lb-phone`**, **`qs-smartphone`** (Quasar V3) or **`qs-smartphone-pro`**
 - `nash_banking` started before the phone apps
 
-The phone type is **auto-detected at startup** — no config needed. LB Phone has priority if both are started.
+The phone type is **auto-detected at startup**, no config needed. Detection order: `nash_phone` → `lb-phone` → `qs-smartphone` → `qs-smartphone-pro`.
 
 ## Installing an app
 
@@ -20,7 +20,7 @@ The phone type is **auto-detected at startup** — no config needed. LB Phone ha
 2. Add to your `server.cfg` **after** `nash_banking`:
 
     ```cfg
-    ensure lb-phone                     # or qs-smartphone-pro
+    ensure nash_phone                   # or lb-phone, qs-smartphone, qs-smartphone-pro
     ensure nash_banking
     ensure nash_banking_phone
     ensure nash_businessbanking_phone
@@ -39,9 +39,15 @@ Each app auto-detects which phone system is running and uses the appropriate API
 ```
 [Nash Banking Phone] Phone system: quasar
 ```
+…or:
+```
+[Nash Banking Phone] Phone system: nash
+```
 
-- **LB Phone** — pre-installed by default via `exports['lb-phone']:AddCustomApp({...})`.
-- **Quasar Phone Pro** — registered in the phone's app store via `exports['qs-smartphone-pro']:addCustomApp({...})`.
+- **NASH Phone** - declared via `exports['nash_phone']:AddCustomApp({...})`. With `DefaultApp = true` the app is installed and placed at the end of the last home page, once per character. It is also listed in the App Store under "Server Apps". If a player removed it from the home screen, it stays in the App Library.
+- **LB Phone** - pre-installed by default via `exports['lb-phone']:AddCustomApp({...})`.
+- **Quasar Phone V3** - registered via `exports['qs-smartphone']:addCustomApp({...})`.
+- **Quasar Phone Pro** - registered in the phone's app store via `exports['qs-smartphone-pro']:addCustomApp({...})`.
 
 The app re-registers automatically if the phone resource restarts (listener on `onResourceStart`).
 
@@ -55,7 +61,7 @@ Each phone app has its own `config.lua`. **The two apps use slightly different s
 Config.Phone = {
     Locale       = 'en',          -- 'fr' or 'en'
     AppName      = 'Nash Banking',
-    DefaultApp   = true,          -- LB Phone only: pre-installed (false = downloadable from the app store)
+    DefaultApp   = true,          -- NASH Phone / LB Phone: pre-installed (false = downloadable from the app store)
     Currency     = '€',
     CurrencyCode = 'EUR',
     BankName     = 'Nash Banking',
@@ -91,7 +97,7 @@ Then restart the phone resource. Recommended size: 120×120 px or larger, square
 
 ## How the phone talks to the server
 
-Both phones use standard FiveM NUI primitives (`RegisterNUICallback` on the server, `fetch()` from the iframe), so the UI code is identical across LB Phone and Quasar Phone Pro. The React app reuses the exact same server callbacks as the desktop UI via `Bridge.TriggerCallback`:
+Both phones use standard FiveM NUI primitives (`RegisterNUICallback` on the server, `fetch()` from the iframe), so the UI code is identical across NASH Phone, LB Phone and Quasar Phone. On NASH Phone the app does not need the `nash-bridge.js` script: it calls its own NUI callbacks directly and listens to the raw `{ action, data }` messages the phone relays. The React app reuses the exact same server callbacks as the desktop UI via `Bridge.TriggerCallback`:
 
 ```lua
 -- Example: home screen data
@@ -109,4 +115,4 @@ Any feature added to `server/main.lua` is immediately usable in the desktop NUI 
 
 ## Disabling phone notifications
 
-In-bank events (transfers received, TPE paid, requests) can mirror to phone toasts. Toggle with `Config.PhoneNotifications = false` in [`shared/config.lua`](../config/config-main.md).
+In-bank events (transfers received, TPE paid, requests) can mirror to phone notifications, on NASH Phone (`SendNotification`) and LB Phone. Toggle with `Config.PhoneNotifications = false` in [`shared/config.lua`](../config/config-main.md).
