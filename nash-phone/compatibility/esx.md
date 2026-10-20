@@ -1,6 +1,6 @@
 # ESX
 
-ESX is the reference platform for NASH Phone: the two SQL helpers shipped in `sql/` target the
+ESX is the reference platform for NASH Phone: the two SQL helpers shipped in `INSTALL/sql/` target the
 default ESX `items` table. Like the other frameworks, it is not a hard dependency of the
 resource: it is detected at boot.
 
@@ -22,6 +22,17 @@ local ESX = exports['es_extended']:getSharedObject()
 
 That matters for start order: the file is loaded on every server, but the export is only
 called once something actually needs a player, which is long after `es_extended` has booted.
+
+**Older ESX (1.x, before Legacy)** has no `getSharedObject` export: the bridge then falls back on
+the old `esx:getSharedObject` event, so those servers work too (since 1.0.1). ESX Legacy stays
+the recommended version.
+
+{% hint style="info" %}
+In `'auto'` mode, ESX is only picked when the core object can really be fetched. A resource that
+is merely **named** `es_extended` without being ESX (some custom bases ship one for compatibility)
+is ignored, with a yellow line in the console. On such a server, set `Config.Framework = 'custom'`
+and fill `server/bridge/custom.lua`, see [Custom Framework](custom-framework.md).
+{% endhint %}
 
 Player loading is picked up through the `esx:playerLoaded` event.
 
@@ -121,7 +132,7 @@ in `Config.ItemName` (default `'phone'`) must exist in your inventory **and** be
 player's pockets.
 
 For the default ESX inventory (the one that reads its items from the `items` table), import
-`sql/item_phone.sql` (its label ships in French, `Téléphone`: change it first on a server in
+`INSTALL/sql/item_phone.sql` (its label ships in French, `Téléphone`: change it first on a server in
 another language), or run:
 
 ```sql
@@ -151,7 +162,7 @@ registers, so there is nothing else to wire.
 ### 2. Create the earbuds item (optional)
 
 `Config.Earbuds` is enabled by default and expects `Config.Earbuds.itemName`
-(default `'phone_earbuds'`). Import `sql/item_earbuds.sql` for the default ESX inventory, or
+(default `'phone_earbuds'`). Import `INSTALL/sql/item_earbuds.sql` for the default ESX inventory, or
 declare it in `ox_inventory/data/items.lua`. Missing, the phone still runs: only private
 listening is unreachable, and the console says so in yellow.
 

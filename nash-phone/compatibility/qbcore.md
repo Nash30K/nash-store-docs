@@ -138,7 +138,7 @@ closes the phone and stops it saving anything until the next character is loaded
 ### 1. Create the phone item
 
 The resource creates no item. Declare `Config.ItemName` (default `'phone'`) in
-`qb-core/shared/items.lua`, using the same name as the config key. The SQL helpers in `sql/`
+`qb-core/shared/items.lua`, using the same name as the config key. The SQL helpers in `INSTALL/sql/`
 target the ESX `items` table and are **not** for QBCore.
 
 If your server runs `ox_inventory` on top of QBCore, declare the item in

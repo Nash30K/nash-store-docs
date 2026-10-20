@@ -112,7 +112,7 @@ The resource creates no item.
     ```
 
     `qb-core/shared/items.lua` for QB. For the default ESX inventory (items in a database
-    `items` table), import `sql/item_phone.sql` and **restart `es_extended`:** ESX only reads
+    `items` table), import `INSTALL/sql/item_phone.sql` and **restart `es_extended`:** ESX only reads
     that table at boot.
 
 2. Or open the phone without any item:
@@ -164,7 +164,7 @@ phone restores the phone's own focus.
 
 **Symptom:** one app answers with an error on a live server, while a fresh install of the
 same version works. `SHOW COLUMNS FROM <table>;` lists fewer columns than the same table in
-`sql/nash_phone.sql`.
+`INSTALL/sql/nash_phone.sql`.
 
 **Cause:** creating a table does nothing to a table that already exists, so a column added by
 an update has to be added to existing installs separately. The phone does it itself at every
@@ -189,7 +189,7 @@ large for the operation to complete in the boot window.
 
 **Fix:** nothing breaks: a missing index makes lists slower, it does not make them wrong. The
 line names the index and its table; its columns are on the matching `KEY` line of that table
-in `sql/nash_phone.sql`. Add it by hand, for example:
+in `INSTALL/sql/nash_phone.sql`. Add it by hand, for example:
 
 ```sql
 ALTER TABLE nash_phone_messages ADD INDEX pair_at (`sender`,`receiver`,`created_at`);
@@ -580,7 +580,7 @@ number is silently cut.
 **Cause:** same as the phone item, in yellow because nothing vital breaks: only private
 listening is unreachable.
 
-**Fix:** create the item in your inventory (or import `sql/item_earbuds.sql` if your
+**Fix:** create the item in your inventory (or import `INSTALL/sql/item_earbuds.sql` if your
 framework keeps items in the database), or set `Config.Earbuds.enabled = false` in
 `config/main.lua` to hide the feature entirely.
 

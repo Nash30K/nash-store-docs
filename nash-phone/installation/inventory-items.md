@@ -10,6 +10,13 @@ to be declared on your side before players can carry them.
 
 Both keys are in `config/main.lua`.
 
+{% hint style="success" %}
+**Ready-to-paste files ship in the `INSTALL` folder** of the resource:
+`INSTALL/ox_inventory/data/items.md`, `INSTALL/qb-core/shared/items.md`,
+`INSTALL/qs-inventory/items.md`, and `INSTALL/sql/` for the default ESX inventory. Copy the
+entries into your inventory, translate the labels, restart.
+{% endhint %}
+
 {% hint style="danger" %}
 With `Config.UseItem = true` (the default), there is **no way around the item**. The `/phone`
 command and the open key go through a server-side check (`nash_phone:requestOpen`), and the
@@ -82,8 +89,8 @@ files ship with the resource:
 
 | File | Item | Label it inserts |
 |---|---|---|
-| `sql/item_phone.sql` | `phone` | `Téléphone` |
-| `sql/item_earbuds.sql` | `phone_earbuds` | `Écouteurs sans fil` |
+| `INSTALL/sql/item_phone.sql` | `phone` | `Téléphone` |
+| `INSTALL/sql/item_earbuds.sql` | `phone_earbuds` | `Écouteurs sans fil` |
 
 Both files ship with French labels: on a server in another language, change the label before
 importing them. Or run the inserts directly, with English labels:
@@ -142,7 +149,7 @@ phone registers both items as usable through `exports['qs-inventory']:CreateUsab
 ## qb-inventory and derivatives
 
 Declare the items in `qb-core/shared/items.lua`, following the shape of the entries already
-in that file. The `sql/` files are for the ESX `items` table and do not apply here. The item **names** must match `Config.ItemName` and `Config.Earbuds.itemName`;
+in that file. The `INSTALL/sql/` files are for the ESX `items` table and do not apply here. The item **names** must match `Config.ItemName` and `Config.Earbuds.itemName`;
 the rest (label, weight, image) is yours. `ps-inventory` and `lj-inventory` are detected the
 same way.
 
@@ -190,7 +197,7 @@ exists. If it does not, it prints this block in red:
 [nash_phone] The /phone command and the F1 key both check this item on the
 [nash_phone] server, so there is no way around it. Pick ONE fix:
 [nash_phone]   1. create the item in your inventory (documentation: Installation > Inventory Items)
-[nash_phone]      or import sql/item_phone.sql if your framework keeps items in the database.
+[nash_phone]      or import INSTALL/sql/item_phone.sql if your framework keeps items in the database.
 [nash_phone]   2. or set Config.UseItem = false in config/main.lua to open
 [nash_phone]      the phone without any item.
 ========================================================================

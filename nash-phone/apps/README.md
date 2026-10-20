@@ -165,7 +165,9 @@ Citizens contact the police, EMS, a mechanic or a taxi; employees of those jobs 
 | `cooldown` | `20` | seconds between two requests from the same character, `0` disables |
 | `ownDuty` | `true` | the app's own duty switch is the truth. `false` hides the switch and waits for another script to call `exports.nash_phone:SetServiceDuty(source, on, receive)` |
 
-Per company: `job` (must match your framework's job name exactly), `label`, `place`, `icon` (the file name of a PNG placed in the resource's `service_icons/` folder), `accent`, `canCall`, `canMessage`, `multiResponders`, `shareLocation`.
+Per company: `job` (must match your framework's job name exactly), `label`, `place`, `coords` (optional, see below), `icon` (the file name of a PNG placed in the resource's `service_icons/` folder), `accent`, `canCall`, `canMessage`, `multiResponders`, `shareLocation`.
+
+**Directions.** A company with `coords = vector3(x, y, z)` shows a **Directions** row on its page. One tap places a GPS waypoint on the player's map and a short message confirms it. The waypoint is set by the player's own game, nothing goes through the server. Without `coords` the row is hidden. The four shipped services come with coordinates; check them against your map. Details in [config/services.lua](../config/config-services.md#directions).
 
 **Icons.** `service_icons/` ships without images, so the four shipped services (`police.png`, `ambulance.png`, ...) show their initial on a badge of their `accent` colour until you add the files. Nothing breaks without them. Use a square PNG, and restart the resource after adding one.
 
@@ -227,7 +229,7 @@ WhatsApp-style messenger: Status, Calls, Chats and a "You" tab.
 
 Photo network: feed, stories, direct messages, activity, profiles, and live broadcasts.
 
-**Real, all of it.** The feed, likes, comments, follows, the activity tab and stories are server-backed and shared. Direct messages are addressed by username. What is left on the phone is only the appearance the player picks for themselves (avatar gradient and emoji) and their saved posts.
+**Real, all of it.** The feed, likes, comments, follows, the activity tab and stories are server-backed and shared. Direct messages are addressed by username. What is left on the phone is only the appearance the player picks for themselves (avatar gradient and emoji) and their saved posts. A profile photo, picked from the camera roll or pasted as a link in **Edit profile**, is an image address: it is saved on the server and other players see it.
 
 **Stories audience** is set by `Config.Social.StoriesAudience.instapic` in `config/social.lua`, shipped as `'everyone'`: every story posted on the server in the last 24 hours appears in the carousel, even from accounts the player does not follow. Set `'following'` to restrict it to accounts the player follows plus their own. A private account only ever shows its stories to its followers, whatever this setting says.
 
@@ -317,6 +319,8 @@ The map can only ever show people the player already follows mutually, so people
 Twitter-style app: timeline, replies, likes, follows, alerts, private messages, profiles.
 
 **Real.** Posts, likes, replies, follows and alerts go through the shared posts foundation; private messages are addressed by username. Only the appearance the player picks for themselves (avatar gradient, emoji, banner) stays on the phone, because the server only accepts an image address, not a colour.
+
+**Profile photo.** In **Edit profile**, tapping the avatar offers **Take a photo of my character** (the RP head, captured like ChatApp's avatar, so it needs `screenshot-basic` and the image host), **Choose from Photos** (the camera roll, videos left out) and, once a photo is set, **Remove photo**. The photo is an image address, so it is saved on the server and other players see it on the profile, posts and replies. The gradient and emoji come back when there is no photo.
 
 **No stories.** BirdBy has none, by design.
 
@@ -499,7 +503,7 @@ A track without a URL is not displayed, and neither is one whose URL does not st
 | Key | Default | Meaning |
 | --- | ------- | ------- |
 | `enabled` | `true` | `false` removes the feature and hides the setting |
-| `itemName` | `'phone_earbuds'` | the inventory item. **The resource creates no items**; create it in your inventory, `sql/item_earbuds.sql` covers the default ESX inventory |
+| `itemName` | `'phone_earbuds'` | the inventory item. **The resource creates no items**; create it in your inventory, `INSTALL/sql/item_earbuds.sql` covers the default ESX inventory |
 | `requireItem` | `true` | must the item be carried for the earbuds to work. `false` means once paired, they work forever |
 
 Using the item once pairs it; using it again connects and disconnects it, like a real pair. The item is never consumed. The setting also lives in Settings > Audio output. Without `xsound` there is no music to route, so the setting stays visible but does nothing.
@@ -822,7 +826,7 @@ The honest list, with the real part of each app called out next to it. No config
 | PlayTube | `playtube` | Videos, channels, comments, subscriptions, private messages. All local, none of it travels | The account (sign-up, sign-in, reset by code) and the pasted-YouTube-link player |
 | TickTok, Lives tab | `ticktok` | The Lives tab only | The rest of the app: feed, likes, comments, follows, activity, private messages |
 
-Two more things are worth telling your players even though the apps themselves are real. The Clock's world-clock cities are GTA universe names with fixed offsets, not real time zones, and its **alarms live in the phone's local storage, not in the database**. Snapz, InstaPic and BirdBy let the player pick an avatar gradient and emoji that never leave their own phone, because the server only stores an image address; Snapz otherwise renders the character's real RP head.
+Two more things are worth telling your players even though the apps themselves are real. The Clock's world-clock cities are GTA universe names with fixed offsets, not real time zones, and its **alarms live in the phone's local storage, not in the database**. Snapz, InstaPic and BirdBy let the player pick an avatar gradient and emoji that never leave their own phone, because the server only stores an image address; Snapz otherwise renders the character's real RP head. A profile photo set in InstaPic or BirdBy is that image address, so other players do see it.
 
 ## What to configure, app by app
 
@@ -833,11 +837,11 @@ A checklist of everything that has to be filled in before an app is useful. Anyt
 | Camera, Photos, all social apps | `config/upload.lua` | **Mandatory.** A Fivemanage API key. Without it the camera refuses to shoot, no photo can be posted anywhere, and Photos hides its **+** button (add by link) |
 | Camera, Photos (add by link) | `config/main.lua` | Nothing if you keep the defaults. `Config.Gallery.Import.Enabled = false` turns adding by link off. If your Fivemanage account serves files from a custom domain, add that domain to `Config.Gallery.Import.AllowedHosts`: Camera photos and videos are checked against that list too |
 | Music | `config/music.lua` | Fill `tracks` and `playlists`. The library ships empty. Requires `xsound` running |
-| Music, private listening | `config/main.lua` | `Config.Earbuds.itemName`, and create the item in **your** inventory. `sql/item_earbuds.sql` for default ESX |
+| Music, private listening | `config/main.lua` | `Config.Earbuds.itemName`, and create the item in **your** inventory. `INSTALL/sql/item_earbuds.sql` for default ESX |
 | Maps | `config/maps.lua` | World bounds, categories, and the places themselves in game coordinates. Use `/phonepos` in chat to read a position |
-| Services | `config/services.lua` | One entry per company, with the exact framework `job` name. Optionally a PNG in `service_icons/` (the folder ships without images) |
+| Services | `config/services.lua` | One entry per company, with the exact framework `job` name. Optionally a PNG in `service_icons/` (the folder ships without images), and `coords` for the Directions row |
 | Mail | `config/main.lua` | `Config.Mail.domain`, and decide on `Config.Cloud.crossLogin` |
-| VideoCall, InstaPic Lives | `config/turn.lua` | **Recommended on a public server.** A Cloudflare TURN key, so players behind a 4G box, CGNAT, strict NAT or a VPN get the picture. Your own TURN server goes in `Config.VideoCall.iceServers` (`config/main.lua`) instead |
+| VideoCall, InstaPic Lives | `config/turn.lua` | **Recommended on a public server.** A Cloudflare or Metered TURN key, so players behind a 4G box, CGNAT, strict NAT or a VPN get the picture. Your own TURN server goes in `Config.VideoCall.iceServers` (`config/main.lua`) instead |
 | InstaPic Lives | `config/social.lua` | `Config.Social.Live.maxViewers`, `audience` and `microphone` |
 | Cindr | `config/social.lua` | `Config.Social.Dating`, in particular `minAge`, `shareZone` and `reports` |
 | Snapz, InstaPic stories | `config/social.lua` | `Config.Social.StoriesAudience` per app |

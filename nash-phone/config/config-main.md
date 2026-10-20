@@ -69,7 +69,7 @@ few signalling messages.
 
 {% hint style="warning" %}
 **On a public server, set up a TURN relay in [config/turn.lua](config-turn.md)** (free
-Cloudflare account). With the STUN server alone, players behind a 4G box, CGNAT, strict NAT or a
+Cloudflare or Metered account). With the STUN server alone, players behind a 4G box, CGNAT, strict NAT or a
 VPN get the sound but no picture.
 {% endhint %}
 
@@ -113,8 +113,8 @@ enough when both networks accept a direct connection. A **TURN** server *relays*
 a direct connection is impossible (4G boxes, CGNAT, strict NAT, VPN). Without TURN those players
 get sound but no image: the rest of the call works normally.
 
-The recommended relay is Cloudflare, set in [config/turn.lua](config-turn.md): the API token
-stays on the server, and its servers are added after this list. To use your own TURN server
+The recommended relay is Cloudflare or Metered, set in [config/turn.lua](config-turn.md): the keys
+stay on the server, and its servers are added after this list. To use your own TURN server
 instead (coturn, or another provider with fixed credentials), uncomment the second block and
 paste your credentials, keeping the UDP, TCP and TLS entries, which is what gets through the
 most firewalls. This file is a shared script and the list is sent to every player, so these
@@ -290,7 +290,7 @@ or the key.
 Receiving **another** phone item replays the first-run setup: see
 [A new phone asks again](config-setup.md#a-new-phone-asks-again).
 
-**ESX default inventory** (the `items` table): import the supplied `sql/item_phone.sql`, or
+**ESX default inventory** (the `items` table): import the supplied `INSTALL/sql/item_phone.sql`, or
 run:
 
 ```sql
@@ -701,7 +701,7 @@ At `requireItem = true`, losing or selling the earbuds sends music back to the s
 item keeps a value, which is the realistic outcome. At `false`, once paired they work forever,
 even without the item.
 
-The resource creates no item here either; see `sql/item_earbuds.sql` for the default ESX
+The resource creates no item here either; see `INSTALL/sql/item_earbuds.sql` for the default ESX
 inventory. About fifteen seconds after startup, the server console warns when the item does not
 exist in your inventory. Without xsound there is no music to route, so the setting stays visible
 but has nothing to do. A missing `Config.Earbuds` block, or an empty `itemName`, turns the

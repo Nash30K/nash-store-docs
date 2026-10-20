@@ -27,7 +27,7 @@ Config.Framework = 'auto'
 | Value | Meaning |
 | ----- | ------- |
 | `'auto'` | Automatic detection (default, recommended) |
-| `'esx'` | ESX Legacy |
+| `'esx'` | ESX Legacy (older ESX 1.x also works, through the `esx:getSharedObject` event) |
 | `'qbcore'` | QBCore |
 | `'qbox'` | Qbox (`qbx_core`) |
 | `'custom'` | Your own, written in `server/bridge/custom.lua` |

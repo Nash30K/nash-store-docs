@@ -71,6 +71,7 @@ list = {
         job = 'police',
         label = 'Police',
         place = 'Mission Row',
+        coords = vector3(441.8, -982.0, 30.7),
         icon = 'police.png',
         accent = '#0a84ff',
         canCall = true,
@@ -86,6 +87,7 @@ list = {
 | `job` | required | The **exact** job name on the framework side. This is the only thing the server looks at to know who works here, so it must match character for character. Comparison is strict: no case folding, no trimming |
 | `label` | the `job` value | Displayed name. It is **not** translated: "Police" stays "Police" in both languages, like a proper noun. Left empty, the raw `job` value is shown (`mechanic`), so always fill it in. Cut at 48 characters |
 | `place` | none | Location shown under the name. Decorative. Cut at 48 characters |
+| `coords` | none | Position of the business, as `vector3(x, y, z)`. When it is set, the business page shows a **Directions** row that places a GPS waypoint there. Without it, the row is hidden. Only `x` and `y` are used. A `vector2`, a `vector4` or a `{ x = ..., y = ... }` table also works. A value that is not a number, or that is beyond 20000 on either axis, is ignored as if the field were absent |
 | `icon` | none | PNG file in the resource's `service_icons/` folder. Cut at 64 characters |
 | `accent` | iOS blue | Colour of the chip, in hexadecimal. Cut at 16 characters |
 | `canCall` | `true` | The citizen can call this service |
@@ -105,6 +107,20 @@ and EMS entries.
 | `false` | First come, first served. Once an employee takes the request, the others can no longer take it. This is what you want for a taxi or a mechanic: one job, one customer |
 
 A duplicate `job` is ignored: the first entry wins.
+
+## Directions
+
+A business with `coords` gets a **Directions** row at the bottom of its page, under the location
+switch, with the `place` text beneath it. One tap sets a GPS waypoint on the player's pause map
+and minimap, and a short "Waypoint set on your map" message confirms it. The waypoint is placed
+by the player's own game: nothing is sent to the server and nobody else is told.
+
+{% hint style="info" %}
+The four shipped entries come with coordinates for Mission Row PD, Pillbox Hill Medical,
+LS Customs in Burton and the Downtown Cab Co. If your map puts these businesses somewhere else,
+change `coords` to match. Stand at the spot and type `/phonepos` in chat: the block it prints in
+F8 contains a `coords = vec3(...)` line you can paste as it is.
+{% endhint %}
 
 ## Icons
 

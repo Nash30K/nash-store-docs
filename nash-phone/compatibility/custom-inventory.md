@@ -294,8 +294,8 @@ Where to declare them depends on your inventory:
 
 - `ox_inventory` → `ox_inventory/data/items.lua`
 - `qb-inventory` and derivatives → `qb-core/shared/items.lua`
-- The default ESX inventory (items in the database `items` table) → import `sql/item_phone.sql`
-  and `sql/item_earbuds.sql`, then restart `es_extended`, which only re-reads that table at
+- The default ESX inventory (items in the database `items` table) → import `INSTALL/sql/item_phone.sql`
+  and `INSTALL/sql/item_earbuds.sql`, then restart `es_extended`, which only re-reads that table at
   startup
 - Anything else → your inventory's own declaration file
 

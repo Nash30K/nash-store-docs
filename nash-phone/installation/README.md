@@ -39,7 +39,7 @@ nash_phone/
 ├── config/            # 14 configuration files, commented: this is what you edit
 ├── client/  server/  shared/   # encrypted, except server/bridge/custom.lua
 ├── locales/           # fr.json, en.json (read at runtime)
-├── sql/               # reference schema + the two item files (nothing to import)
+├── INSTALL/           # ready-to-paste items (ox_inventory, qb-core, qs-inventory) + sql/
 ├── assets/prop/       # the coloured shells of the 3D model
 ├── service_icons/     # your PNG icons for the Services app
 ├── custom_app_bridge/ # bridge for third-party applications
@@ -59,7 +59,7 @@ readable and editable:
 
 Every other Lua file is encrypted. The interface ships compiled in `web/build/`, without its
 sources. The JSON files of `locales/` (see [Add a language](../guides/add-language.md)), the
-`sql/` files and the PNG files of `service_icons/` stay plain files you can open and edit.
+`INSTALL/sql/` files and the PNG files of `service_icons/` stay plain files you can open and edit.
 
 {% hint style="info" %}
 Asset Escrow only runs the resource on a server whose license key belongs to the Cfx.re account

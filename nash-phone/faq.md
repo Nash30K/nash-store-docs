@@ -61,10 +61,10 @@ A custom framework or inventory is written in `server/bridge/custom.lua`: see
 <summary>Do I have to import the SQL file?</summary>
 
 No. The resource creates its 31 tables at boot and adds new columns and indexes on later
-updates without any action from you. `sql/nash_phone.sql` ships the same schema for
+updates without any action from you. `INSTALL/sql/nash_phone.sql` ships the same schema for
 owners who prefer to prepare the database by hand, but it is not needed.
 
-The two files you *may* need are `sql/item_phone.sql` and `sql/item_earbuds.sql`, and only if
+The two files you *may* need are `INSTALL/sql/item_phone.sql` and `INSTALL/sql/item_earbuds.sql`, and only if
 your framework keeps items in a database `items` table (default ESX inventory). With
 `ox_inventory` or any modern inventory, declare the items there instead. See
 [Inventory items](installation/inventory-items.md).
@@ -367,7 +367,8 @@ the rest of the call works normally.
 
 The simplest relay is Cloudflare: create a free account, create a TURN key, and paste its Key
 ID and API token into [`config/turn.lua`](config/config-turn.md). The free tier covers the
-first 1,000 GB each month. You can also use your own TURN server (coturn, or another provider
+first 1,000 GB each month. If Cloudflare does not work for you, Metered (free plan) is built
+in too: an app name and an API key in the same file. You can also use your own TURN server (coturn, or another provider
 with fixed credentials) in `Config.VideoCall.iceServers`. Details in
 [Video calls and live streams](guides/setup-video-calls.md).
 

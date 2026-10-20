@@ -131,7 +131,7 @@ Config.Earbuds = {
 ```
 
 The resource creates no item. Create `phone_earbuds` in **your** inventory, or import
-`sql/item_earbuds.sql` if your framework keeps items in the database. If the item does not
+`INSTALL/sql/item_earbuds.sql` if your framework keeps items in the database. If the item does not
 exist, the server prints a yellow warning at startup and nobody can pair earbuds.
 
 ## How to know it works

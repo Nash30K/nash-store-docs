@@ -116,7 +116,7 @@ Declare `Config.ItemName` (default `'phone'`) in `ox_inventory/data/items.lua`:
 },
 ```
 
-The SQL helpers in `sql/` target the default ESX `items` table and are not for QBOX.
+The SQL helpers in `INSTALL/sql/` target the default ESX `items` table and are not for QBOX.
 
 ### 2. Create the earbuds item (optional)
 

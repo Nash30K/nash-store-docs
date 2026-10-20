@@ -17,7 +17,7 @@ If it also had catching up to do, the same line reports it:
 
 A column that was widened (see `TYPES` below) is not counted on that line.
 
-`sql/nash_phone.sql` contains the same `CREATE TABLE` statements. **It is not read by the
+`INSTALL/sql/nash_phone.sql` contains the same `CREATE TABLE` statements. **It is not read by the
 resource.** It exists as a reference, and so you can prepare the database by hand before the
 first boot if your workflow requires it. It is not a required step, and importing it does not
 replace a first start (see [The `.sql` file is not enough](#the-sql-file-is-not-enough)).
@@ -183,7 +183,7 @@ once. An index that cannot be created is reported in the console and the boot co
 
 ### The `.sql` file is not enough
 
-`sql/nash_phone.sql` is kept in sync with the full schema, tables, columns, types and indexes
+`INSTALL/sql/nash_phone.sql` is kept in sync with the full schema, tables, columns, types and indexes
 alike. It is still only a starting point: the resource runs its catch-up passes at **every**
 boot, and they are what keeps a live database correct across updates.
 

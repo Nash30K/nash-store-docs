@@ -8,8 +8,8 @@ other's image instead of only hearing them.
 - Filesystem access to the `nash_phone` resource folder
 - `Config.VideoCall` in `config/main.lua`
 - `Config.Social.Live` in `config/social.lua`
-- On a public server, a TURN relay: a free Cloudflare account (`config/turn.lua`, recommended),
-  or your own TURN server. Read the next sections to see why
+- On a public server, a TURN relay: a free Cloudflare or Metered account (`config/turn.lua`,
+  recommended), or your own TURN server. Read the next sections to see why
 
 ## What travels where: read this first, it decides the settings
 
@@ -92,13 +92,14 @@ startup:
 [nash_phone] video: no TURN relay configured, players behind some networks (4G box, CGNAT, strict NAT, VPN) will get sound without picture. See config/turn.lua.
 ```
 
-You have two ways to add a relay: Cloudflare through `config/turn.lua` (next section), or your
-own TURN server in `Config.VideoCall.iceServers` (section 4).
+You have two ways to add a relay: Cloudflare or Metered through `config/turn.lua` (next
+section), or your own TURN server in `Config.VideoCall.iceServers` (section 4).
 
 ## 3. Cloudflare TURN (recommended)
 
 `config/turn.lua` connects the phone to Cloudflare's TURN service. You paste one key, and the
-server takes care of the rest.
+server takes care of the rest. Metered works the same way with `provider = 'metered'`, an app
+name and an API key: see [config/turn.lua](../config/config-turn.md#metered).
 
 1. Create a free account on [https://dash.cloudflare.com](https://dash.cloudflare.com).
 2. In the dashboard, open **Realtime**, then **TURN**, and create a key.

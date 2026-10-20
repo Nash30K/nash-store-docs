@@ -211,7 +211,7 @@ also reads their `isdead` and `inlaststand` metadata: a player on the ground, ev
 stand, cannot use the phone.
 
 {% hint style="warning" %}
-ESX is the reference platform: the two SQL helpers shipped in `sql/` (`item_phone.sql`,
+ESX is the reference platform: the two SQL helpers shipped in `INSTALL/sql/` (`item_phone.sql`,
 `item_earbuds.sql`) target the default ESX `items` table. No framework is listed in the
 resource's hard dependencies (only OneSync, `ox_lib` and `oxmysql` are). The QBCore and QBOX bridges are
 complete and use only documented core APIs, but we do not claim production hours on them.
